@@ -9,7 +9,7 @@ import {
     type SourceComparePayload,
     type StockSentimentInsights,
 } from './adanos.helpers';
-import { fetchAdanosJSON, ADANOS_BASE_URL, RecentFailure } from '@/lib/adanos/fetch';
+import { fetchAdanosJSON, ADANOS_BASE_URL, RecentFailure, MonthlyQuotaExceeded } from '@/lib/adanos/fetch';
 
 const DEFAULT_LOOKBACK_DAYS = 7;
 
@@ -28,8 +28,8 @@ async function fetchCompareSource(
 
         return normalizeSourceInsight(source, row);
     } catch (error) {
-        if (error instanceof RecentFailure) {
-            // 在失败冷却期内，静默跳过，不重复打印错误
+        if (error instanceof RecentFailure || error instanceof MonthlyQuotaExceeded) {
+            // 在失败冷却期内，或月度配额已耗尽，静默跳过，不重复打印错误
             return null;
         }
         const message = (error as Error).message;

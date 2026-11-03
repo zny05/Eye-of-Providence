@@ -74,7 +74,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                             在不同组合之间切换，查看该组合下的股票行情。每个组合独立保存，仅对你可见。
                         </p>
                     </div>
-                    <GroupSelector currentGroupId={selectedGroup?._id ?? ''} onGroupChange={() => {}} />
+                    <GroupSelector />
                     {selectedGroup && (
                         <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)]">
                             <Panel title={selectedGroup.name} sub={`${selectedGroup.symbols.length} 只股票`}>

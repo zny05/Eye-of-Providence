@@ -29,7 +29,22 @@ const FAILURE_TTL_MS = 60_000;
 // Cache TTL: realtime mode = 60s, cached mode = 3600s
 const CACHE_TTL_SECONDS = process.env.NEXT_PUBLIC_OPENSTOCK_DATA_MODE === 'realtime' ? 60 : 3600;
 
+// Monthly quota circuit breaker: once Adanos returns "Monthly API limit exceeded",
+// stop all Adanos requests for this cooldown to avoid log spam and wasted attempts.
+const MONTHLY_QUOTA_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+let monthlyQuotaExhaustedUntil = 0;
+
 class RecentFailure extends Error {}
+class MonthlyQuotaExceeded extends Error {}
+
+function isMonthlyQuotaExhausted(): boolean {
+    return Date.now() < monthlyQuotaExhaustedUntil;
+}
+
+function markMonthlyQuotaExhausted() {
+    monthlyQuotaExhaustedUntil = Date.now() + MONTHLY_QUOTA_COOLDOWN_MS;
+    console.error(`Adanos monthly quota exhausted. No Adanos requests until ${new Date(monthlyQuotaExhaustedUntil).toISOString()}.`);
+}
 
 let activeRequests = 0;
 const waitingForSlot: (() => void)[] = [];
@@ -50,6 +65,8 @@ async function withSlot<T>(run: () => Promise<T>): Promise<T> {
 }
 
 async function fetchWithKeyPool(url: string): Promise<Response> {
+    if (isMonthlyQuotaExhausted()) throw new MonthlyQuotaExceeded('Adanos monthly quota exhausted');
+
     if (ADANOS_KEYS.length === 0) throw new Error('No Adanos API key configured (ADANOS_API_KEY)');
     let res: Response | null = null;
     for (let attempt = 0; attempt < ADANOS_KEYS.length; attempt++) {
@@ -60,6 +77,17 @@ async function fetchWithKeyPool(url: string): Promise<Response> {
             cache: 'no-store',
         });
         if (res.status !== 429) break;
+
+        // Check if this is a monthly quota exceeded response (all keys exhausted)
+        try {
+            const body = await res.clone().text();
+            if (body.includes('Monthly API limit exceeded')) {
+                markMonthlyQuotaExhausted();
+                break;
+            }
+        } catch {
+            // ignore body parse errors, continue to next key
+        }
     }
     return res!;
 }
@@ -115,4 +143,4 @@ async function fetchAdanosJSON<T>(url: string, revalidateSeconds = CACHE_TTL_SEC
     return hit.value as T;
 }
 
-export { fetchAdanosJSON, ADANOS_BASE_URL, ADANOS_KEYS, RecentFailure };
+export { fetchAdanosJSON, ADANOS_BASE_URL, ADANOS_KEYS, RecentFailure, MonthlyQuotaExceeded };

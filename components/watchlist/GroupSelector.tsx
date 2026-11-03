@@ -3,11 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { ChevronDown, Plus } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import {
-    createWatchlistGroup,
-    getWatchlistGroups,
-    setDefaultWatchlistGroup,
-} from '@/lib/actions/watchlist-group.actions';
+import { createWatchlistGroup, getWatchlistGroups, setDefaultWatchlistGroup } from '@/lib/actions/watchlist-group.actions';
 
 type Group = {
     _id: string;
@@ -15,17 +11,15 @@ type Group = {
     isDefault: boolean;
 };
 
-interface GroupSelectorProps {
-    currentGroupId: string;
-    onGroupChange: (groupId: string) => void;
-}
-
-export default function GroupSelector({ currentGroupId, onGroupChange }: GroupSelectorProps) {
+export default function GroupSelector() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [groups, setGroups] = useState<Group[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [newGroupName, setNewGroupName] = useState('');
+
+    const currentGroupId = searchParams.get('groupId') ?? '';
+    const currentGroup = groups.find((g) => g._id === currentGroupId);
 
     const loadGroups = useCallback(async () => {
         const data = await getWatchlistGroups();
@@ -55,10 +49,7 @@ export default function GroupSelector({ currentGroupId, onGroupChange }: GroupSe
         const params = new URLSearchParams(searchParams.toString());
         params.set('groupId', groupId);
         router.push(`?${params.toString()}`);
-        onGroupChange(groupId);
     };
-
-    const currentGroup = groups.find((g) => g._id === currentGroupId);
 
     return (
         <div className="flex items-center gap-3">
