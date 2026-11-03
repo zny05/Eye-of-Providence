@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(ls \"$HOME/.claude/projects/c--Users-HadesCanyon-Downloads-Eye-of-Providence/memory/\" 2>/dev/null || echo \"no memory dir\")",
+      "Read(//c/Users/HadesCanyon/.claude/projects/c--Users-HadesCanyon-Downloads-Eye-of-Providence/memory/**)",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(./node_modules/.bin/vitest run *)",
+      "Bash(./node_modules/.bin/eslint lib/adanos lib/actions/adanos-collect.actions.ts lib/actions/adanos.actions.ts \"app/api/adanos\" \"app/\\(root\\)/adanos\" components/adanos __tests__/adanos-confidence-index.test.ts lib/inngest/functions.ts app/api/inngest/route.ts components/shell/Sidebar.tsx)",
+      "Bash(./node_modules/.bin/eslint lib/adanos lib/actions/adanos-collect.actions.ts \"app/api/adanos\" \"app/\\(root\\)/adanos\" components/adanos __tests__/adanos-confidence-index.test.ts components/shell/Sidebar.tsx)",
+      "Bash(echo \"TSC EXIT: $?\")",
+      "Read(//c/Users/HadesCanyon/.claude/projects/c--Users-HadesCanyon-Downloads-Eye-of-Providence/**)",
+      "Bash(ls -la \"C:\\\\Users\\\\HadesCanyon\\\\.claude\\\\projects\\\\c--Users-HadesCanyon-Downloads-Eye-of-Providence\\\\memory/\" 2>/dev/null)",
+      "Bash(ls \"C:\\\\Users\\\\HadesCanyon\\\\.claude\\\\projects\\\\c--Users-HadesCanyon-Downloads-Eye-of-Providence/MEMORY.md\" 2>/dev/null || echo \"no MEMORY.md\")",
+      "Bash(npx vitest *)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\HadesCanyon\\.claude\\projects\\c--Users-HadesCanyon-Downloads-Eye-of-Providence"
+    ]
+  }
+}

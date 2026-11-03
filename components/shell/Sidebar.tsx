@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpen, Code2, Heart, Info, LayoutDashboard, LifeBuoy, LogOut, Search, Star } from "lucide-react";
+import { BookOpen, Code2, Gauge, Heart, Info, LayoutDashboard, LifeBuoy, LogOut, Search, Star } from "lucide-react";
 import { openSearch } from "@/components/SearchCommand";
 import { signOut } from "@/lib/actions/auth.actions";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,7 @@ type SidebarProps = {
 };
 
 const RESOURCES = [
+    { href: '/adanos', label: 'Adanos sentiment', icon: Gauge },
     { href: '/help', label: 'Help', icon: LifeBuoy },
     { href: '/api-docs', label: 'API docs', icon: Code2 },
     { href: '/about', label: 'About', icon: Info },

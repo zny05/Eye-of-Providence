@@ -9,6 +9,13 @@ services:
       - "3000:3000"
     env_file:
       - .env
+    environment:
+      # 强制走 mihomo 代理
+      - HTTP_PROXY=http://10.1.1.238:7890
+      - HTTPS_PROXY=http://10.1.1.238:7890
+      - ALL_PROXY=http://10.1.1.238:7890
+      # 内网和本地服务不走代理（非常重要）
+      - NO_PROXY=localhost,127.0.0.1,mongodb,10.1.1.0/24,172.16.0.0/12,10.1.1.238
     restart: unless-stopped
     depends_on:
       mongodb:
@@ -21,7 +28,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       # Set MONGO_ROOT_PASSWORD in .env and use the same password in MONGODB_URI. Only read on the first start.
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-example}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-makemoneytorich}
     # No published port: only the app reaches MongoDB, over the Compose network. To use mongosh or Compass from
     # your machine, add  ports: ["127.0.0.1:27017:27017"]  (a bare "27017:27017" exposes it on every interface).
     volumes:

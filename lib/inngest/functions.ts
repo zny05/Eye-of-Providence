@@ -3,6 +3,7 @@ import { NEWS_SUMMARY_EMAIL_PROMPT, PERSONALIZED_WELCOME_EMAIL_PROMPT } from "@/
 import { sendNewsSummaryEmail, sendStockAlertEmail, sendWelcomeEmail } from "@/lib/nodemailer";
 import { getAllUsersForNewsEmail, getWatchlistSymbolsByEmail } from "@/lib/actions/user.actions";
 import { getNews } from "@/lib/actions/finnhub.actions";
+import { collectAdanosSentiment } from "@/lib/actions/adanos-collect.actions";
 import { getFormattedTodayDate } from "@/lib/utils";
 import { callAIProviderWithFallback } from "@/lib/ai-provider";
 
@@ -478,5 +479,47 @@ export const checkInactiveUsers = inngest.createFunction(
         });
 
         return { processed: inactiveUsers.length, sent: results };
+    }
+);
+
+/**
+ * Collect Adanos sentiment for every symbol on every user's watchlist once per
+ * day (02:00 UTC). Runs serially (concurrency 1) so one run finishes before the
+ * next starts, protecting the shared Adanos free-tier quota (250 requests/month
+ * across all endpoints). Results are persisted to AdanosSentimentSnapshot so
+ * the Market Confidence Index reads from local history instead of calling Adanos
+ * on every page view.
+ */
+export const collectAdanosSentimentJob = inngest.createFunction(
+    { id: 'collect-adanos-sentiment', concurrency: 1, triggers: [{ cron: '0 2 * * *' }] }, // Daily 02:00 UTC
+    async ({ step }) => {
+        const { connectToDatabase } = await import("@/database/mongoose");
+        const mongoose = await connectToDatabase();
+        const db = mongoose.connection.db;
+        if (!db) throw new Error("No DB Connection");
+
+        // Every symbol present on any user's watchlist, collected once regardless of owner.
+        const symbols = (await db.collection('watchlists').distinct('symbol')).filter(
+            (s): s is string => typeof s === 'string',
+        );
+
+        let totalCollected = 0;
+        const skipped: Record<string, string[]> = {};
+
+        for (const symbol of symbols) {
+            const result = await step.run(`collect-${symbol}`, async () => {
+                const { collectAdanosSentimentForSymbol } = await import("@/lib/actions/adanos-collect.actions");
+                return collectAdanosSentimentForSymbol(symbol);
+            });
+
+            totalCollected += result.collected;
+            if (result.skipped.length > 0) skipped[symbol] = result.skipped;
+        }
+
+        return {
+            symbols: symbols.length,
+            collected: totalCollected,
+            skipped,
+        };
     }
 );

@@ -4,15 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-OpenStock — a free, open-source market data platform (Next.js 15 App Router, React 19, TypeScript, Tailwind CSS v4, shadcn/ui + Radix, Better Auth + MongoDB/Mongoose, Finnhub market data, TradingView widgets, Inngest background jobs, Nodemailer/Kit email, multi-provider AI: Gemini default with MiniMax/Siray fallback).
+OpenStock — a free, open-source market data platform (Next.js 15 App Router, React 19, TypeScript, Tailwind CSS v4, shadcn/ui + Radix, Better Auth + MongoDB/Mongoose, Finnhub market data, TradingView widgets, Inngest background jobs, Nodemailer/Kit email, multi-provider AI: Gemini default with MiniMax/Siray/OpenRouter fallback).
 
 ## Commands
 
 | Command | Purpose |
 |---|---|
-| `npm run dev` | Dev server with Turbopack (http://localhost:3000) |
-| `npm run build` | Production build with Turbopack |
-| `npm start` | Start the production server |
+| `npm run dev` | Dev server with Turbopack (http://localhost:3000) — local development only |
+| `npm run build` | Production build with Turbopack — local dev / CI only; Docker builds this internally |
+| `npm start` | Start the production server — local dev / CI only; Docker runs this via `CMD` |
 | `npm run lint` | ESLint |
 | `npm test` | Vitest, runs once (`npm run test:watch` to keep watching) |
 | `npx vitest run <path>` | Run a single test file, e.g. `npx vitest run __tests__/ai-provider.test.ts` |
@@ -20,6 +20,9 @@ OpenStock — a free, open-source market data platform (Next.js 15 App Router, R
 | `npm run test:db` | Checks the MongoDB connection |
 | `node scripts/check-env.mjs` | Validates `.env` |
 | `npx inngest-cli@latest dev` | Inngest dev server — run alongside the app locally for welcome emails, price alerts, weekly digest |
+| `docker compose up -d --build` | **Production deployment on 飞牛NAS** — builds the Docker image and starts OpenStock + MongoDB containers |
+
+> **Important:** Do **not** run `npm install` / `npm run build` / `npm start` directly on the 飞牛NAS host. The `Dockerfile` already runs `npm ci` + `npm run build` at image build time and `npm start` at container runtime. All intermediate artifacts (`node_modules`, `.next/`) stay inside the Docker image layers and never pollute the NAS host filesystem.
 
 ### Required environment variables
 `MONGODB_URI`, `BETTER_AUTH_SECRET` (`openssl rand -hex 32`), `BETTER_AUTH_URL`, `FINNHUB_API_KEY`. Copy `.env.example` to `.env` and fill in. `next build` freezes `NEXT_PUBLIC_*` values into the bundle, so Docker/Railway images built without secrets read `FINNHUB_API_KEY` (not the `NEXT_PUBLIC_` alias) at runtime via `lib/actions/finnhub.actions.ts`.
@@ -68,6 +71,51 @@ Four functions, all with AI-provider fallback via `callAIProviderWithFallback`:
 
 ### Components
 `components/ui/` — shadcn primitives (button, input, dialog, etc.). `components/shell/` — app shell. Feature folders: `stocks/`, `watchlist/`, `landing/`, `marketing/`, `forms/`, `profile/`, `sponsors/`, `seo/`. TradingView widget configs live in `lib/constants.ts` (candle chart, technicals, profile, financials, heatmap, timeline).
+
+## Deployment on 飞牛NAS (Docker Compose)
+
+OpenStock is containerized and intended to be deployed on 飞牛NAS via Docker Compose. Do **not** run npm commands on the NAS host.
+
+### 1. Sync source code to NAS
+
+Only sync tracked source files — never copy `node_modules/`, `.next/`, `.env`, or other local dev artifacts to the NAS. Recommended:
+
+```bash
+# On your local machine
+git archive --format=zip HEAD -o openstock-deploy.zip
+# Copy openstock-deploy.zip to the NAS and extract it
+```
+
+Or use `rsync` with exclusions:
+```bash
+rsync -av --delete --exclude='node_modules' --exclude='.next' --exclude='coverage' --exclude='.env' --exclude='.DS_Store' ./ nas-user@nas-ip:/path/to/openstock/
+```
+
+### 2. Configure environment on NAS
+
+```bash
+cd /path/to/openstock
+cp .env.example .env
+# Edit .env with NAS-specific values:
+# MONGODB_URI, BETTER_AUTH_SECRET, BETTER_AUTH_URL, FINNHUB_API_KEY,
+# AI_PROVIDER=openrouter, OPENROUTER_API_KEY, etc.
+# Do NOT copy your local .env — NAS needs its own secrets.
+```
+
+### 3. Build and start
+
+```bash
+docker compose up -d --build
+```
+
+This builds the image (running `npm ci` + `npm run build` inside Docker) and starts the OpenStock + MongoDB containers. All build artifacts stay inside Docker image layers.
+
+### 4. Cleanup (optional, to reclaim Docker space)
+
+```bash
+docker image prune -f
+docker builder prune -f
+```
 
 ## Conventions to keep
 - Server actions: validate all input (symbol regex, country/goal/risk/industry against `lib/constants.ts` options), never trust client `userId`, `revalidatePath` after mutations.

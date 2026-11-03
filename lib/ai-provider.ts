@@ -2,14 +2,15 @@
  * AI Provider abstraction for OpenStock.
  *
  * Supports multiple LLM backends via the AI_PROVIDER environment variable:
- *   - "gemini"  (default) – Google Gemini REST API
- *   - "minimax" – MiniMax (OpenAI-compatible)
- *   - "siray"   – Siray.ai (OpenAI-compatible)
+ *   - "gemini"    (default) – Google Gemini REST API
+ *   - "minimax"   – MiniMax (OpenAI-compatible)
+ *   - "siray"     – Siray.ai (OpenAI-compatible)
+ *   - "openrouter" – OpenRouter (OpenAI-compatible)
  *
  * Each provider returns a plain-text string from the model.
  */
 
-export type AIProviderName = "gemini" | "minimax" | "siray";
+export type AIProviderName = "gemini" | "minimax" | "siray" | "openrouter";
 
 export interface AIProviderConfig {
   name: AIProviderName;
@@ -49,6 +50,15 @@ export function getProviderConfig(
         model: "siray-1.0-ultra",
       };
 
+    case "openrouter":
+      return {
+        name: "openrouter",
+        apiKey: process.env.OPENROUTER_API_KEY || "",
+        baseUrl:
+          process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
+        model: process.env.OPENROUTER_MODEL || "anthropic/claude-sonnet-4.5",
+      };
+
     case "gemini":
     default:
       return {
@@ -69,10 +79,15 @@ export function getFallbackProviderName(
   primary: AIProviderName
 ): AIProviderName {
   if (primary === "gemini") {
-    // Prefer MiniMax as fallback when a key is available, else Siray
+    // Prefer MiniMax as fallback when a key is available, else Siray,
+    // then OpenRouter if configured.
     if (process.env.MINIMAX_API_KEY) return "minimax";
     if (process.env.SIRAY_API_KEY) return "siray";
+    if (process.env.OPENROUTER_API_KEY) return "openrouter";
     return "minimax"; // caller will see missing-key error
+  }
+  if (primary === "openrouter") {
+    return "gemini";
   }
   return "gemini";
 }
