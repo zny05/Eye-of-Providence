@@ -13,7 +13,8 @@
       "Read(//c/Users/HadesCanyon/.claude/projects/c--Users-HadesCanyon-Downloads-Eye-of-Providence/**)",
       "Bash(ls -la \"C:\\\\Users\\\\HadesCanyon\\\\.claude\\\\projects\\\\c--Users-HadesCanyon-Downloads-Eye-of-Providence\\\\memory/\" 2>/dev/null)",
       "Bash(ls \"C:\\\\Users\\\\HadesCanyon\\\\.claude\\\\projects\\\\c--Users-HadesCanyon-Downloads-Eye-of-Providence/MEMORY.md\" 2>/dev/null || echo \"no MEMORY.md\")",
-      "Bash(npx vitest *)"
+      "Bash(npx vitest *)",
+      "Bash(npx eslint *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\HadesCanyon\\.claude\\projects\\c--Users-HadesCanyon-Downloads-Eye-of-Providence"

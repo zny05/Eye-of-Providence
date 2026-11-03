@@ -3,8 +3,8 @@
 import { connectToDatabase } from '@/database/mongoose';
 import { AdanosSentimentSnapshot } from '@/database/models/adanos-sentiment.model';
 import { requireUserId } from '@/lib/better-auth/auth';
+import { fetchAdanosJSON } from '@/lib/adanos/fetch';
 
-const FETCH_TIMEOUT_MS = 8000;
 const MAX_POINTS_PER_SOURCE = 120; // cap retained history per symbol + source
 
 type AdanosSourceKey = 'reddit' | 'x' | 'news' | 'polymarket' | 'crypto';
@@ -16,44 +16,6 @@ const SOURCE_PATHS: Record<AdanosSourceKey, string> = {
     polymarket: '/polymarket/stocks/v1/compare',
     crypto: '/crypto/v1/trending',
 };
-
-function getAdanosBaseUrl(): string {
-    return (process.env.ADANOS_API_BASE_URL || 'https://api.adanos.org').replace(/\/$/, '');
-}
-
-function getAdanosApiKey(): string {
-    return process.env.ADANOS_API_KEY ?? '';
-}
-
-async function fetchAdanosJson<T>(path: string, params: Record<string, string>): Promise<T | null> {
-    if (!getAdanosApiKey()) return null;
-
-    const url = new URL(`${getAdanosBaseUrl()}${path}`);
-    for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    let response: Response;
-    try {
-        response = await fetch(url.toString(), {
-            headers: { 'X-API-Key': getAdanosApiKey() },
-            signal: controller.signal,
-            cache: 'no-store',
-        });
-    } finally {
-        clearTimeout(timeout);
-    }
-
-    if (response.status === 404) return null;
-    if (!response.ok) {
-        console.error(`Adanos collection ${path} failed: ${response.status}`);
-        return null;
-    }
-    return (await response.json()) as T;
-}
-
-type ComparePayload = { stocks?: unknown[] };
-type CryptoPayload = { coins?: unknown[] };
 
 function toNumber(value: unknown): number | null {
     if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -85,6 +47,10 @@ function normalizeRow(source: AdanosSourceKey, row: unknown) {
 /**
  * Internal collection used by both the user-facing server action and the scheduled
  * background job. No auth here — background jobs run server-side without a session.
+ *
+ * Sources are fetched serially (one at a time) to avoid hitting Adanos' 100/min rate limit.
+ * Each source endpoint is fetched once per call; the fetch layer dedupes identical URLs
+ * across concurrent callers.
  */
 async function collectAdanosSentimentForSymbol(symbol: string): Promise<{
     collected: number;
@@ -102,9 +68,8 @@ async function collectAdanosSentimentForSymbol(symbol: string): Promise<{
 
     for (const source of sources) {
         const isCrypto = source === 'crypto';
-        const payload = await fetchAdanosJson<ComparePayload | CryptoPayload>(
-            SOURCE_PATHS[source],
-            isCrypto ? { limit: '100' } : { tickers: normalizedSymbol, days: '7' },
+        const payload = await fetchAdanosJSON<{ stocks?: unknown[]; coins?: unknown[] }>(
+            `${process.env.ADANOS_API_BASE_URL || 'https://api.adanos.org'}${SOURCE_PATHS[source]}?${isCrypto ? 'limit=100' : `tickers=${normalizedSymbol}&days=7`}`,
         );
 
         if (!payload) {
@@ -112,11 +77,10 @@ async function collectAdanosSentimentForSymbol(symbol: string): Promise<{
             continue;
         }
 
-        const payloadTyped = payload as ComparePayload & CryptoPayload;
-        const rows: unknown[] = Array.isArray(payloadTyped.stocks)
-            ? payloadTyped.stocks
-            : Array.isArray(payloadTyped.coins)
-                ? payloadTyped.coins
+        const rows: unknown[] = Array.isArray(payload.stocks)
+            ? payload.stocks
+            : Array.isArray(payload.coins)
+                ? payload.coins
                 : [];
 
         const tickerField = isCrypto ? 'symbol' : 'ticker';

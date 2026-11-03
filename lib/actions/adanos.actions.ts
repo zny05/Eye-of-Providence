@@ -9,17 +9,9 @@ import {
     type SourceComparePayload,
     type StockSentimentInsights,
 } from './adanos.helpers';
+import { fetchAdanosJSON, ADANOS_BASE_URL, RecentFailure } from '@/lib/adanos/fetch';
 
 const DEFAULT_LOOKBACK_DAYS = 7;
-const FETCH_TIMEOUT_MS = 5000;
-
-function getAdanosBaseUrl(): string {
-    return (process.env.ADANOS_API_BASE_URL || 'https://api.adanos.org').replace(/\/$/, '');
-}
-
-function getAdanosApiKey(): string {
-    return process.env.ADANOS_API_KEY ?? '';
-}
 
 async function fetchCompareSource(
     source: SentimentSourceKey,
@@ -27,39 +19,21 @@ async function fetchCompareSource(
     days: number,
 ): Promise<SentimentSourceInsight | null> {
     try {
-        const url = new URL(`${getAdanosBaseUrl()}${SOURCE_CONFIG[source].path}`);
+        const url = new URL(`${ADANOS_BASE_URL}${SOURCE_CONFIG[source].path}`);
         url.searchParams.set('tickers', symbol.toUpperCase());
         url.searchParams.set('days', String(days));
 
-        const abortController = new AbortController();
-        const timeout = setTimeout(() => abortController.abort(), FETCH_TIMEOUT_MS);
-        let response: Response;
-        try {
-            response = await fetch(url.toString(), {
-                headers: {
-                    'X-API-Key': getAdanosApiKey(),
-                },
-                signal: abortController.signal,
-                next: { revalidate: 300 },
-            });
-        } finally {
-            clearTimeout(timeout);
-        }
-
-        if (response.status === 404) {
-            return null;
-        }
-
-        if (!response.ok) {
-            console.error(`Adanos ${source} compare failed for ${symbol}: ${response.status}`);
-            return null;
-        }
-
-        const payload = (await response.json()) as SourceComparePayload;
-        const row = payload.stocks?.find((item) => item.ticker?.toUpperCase() === symbol.toUpperCase());
+        const payload = await fetchAdanosJSON<SourceComparePayload>(url.toString());
+        const row = payload?.stocks?.find((item) => item.ticker?.toUpperCase() === symbol.toUpperCase());
 
         return normalizeSourceInsight(source, row);
     } catch (error) {
+        if (error instanceof RecentFailure) {
+            // 在失败冷却期内，静默跳过，不重复打印错误
+            return null;
+        }
+        const message = (error as Error).message;
+        if (message.includes('404')) return null;
         console.error(`Adanos ${source} compare request failed for ${symbol}`, error);
         return null;
     }
@@ -69,7 +43,7 @@ export async function getStockSentimentInsights(
     symbol: string,
     days: number = DEFAULT_LOOKBACK_DAYS,
 ): Promise<StockSentimentInsights | null> {
-    if (!getAdanosApiKey() || !symbol?.trim()) {
+    if (!process.env.ADANOS_API_KEY || !symbol?.trim()) {
         return null;
     }
 

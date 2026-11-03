@@ -3,7 +3,7 @@ import { NEWS_SUMMARY_EMAIL_PROMPT, PERSONALIZED_WELCOME_EMAIL_PROMPT } from "@/
 import { sendNewsSummaryEmail, sendStockAlertEmail, sendWelcomeEmail } from "@/lib/nodemailer";
 import { getAllUsersForNewsEmail, getWatchlistSymbolsByEmail } from "@/lib/actions/user.actions";
 import { getNews } from "@/lib/actions/finnhub.actions";
-import { collectAdanosSentiment } from "@/lib/actions/adanos-collect.actions";
+import { collectAdanosSentimentForSymbol } from "@/lib/actions/adanos-collect.actions";
 import { getFormattedTodayDate } from "@/lib/utils";
 import { callAIProviderWithFallback } from "@/lib/ai-provider";
 
@@ -506,14 +506,19 @@ export const collectAdanosSentimentJob = inngest.createFunction(
         let totalCollected = 0;
         const skipped: Record<string, string[]> = {};
 
+        // Process symbols serially with a small delay between each to avoid bursting Adanos'
+        // 100/min rate limit. Inngest's concurrency: 1 already serializes runs, but within
+        // one run we still need to pace per-symbol requests.
         for (const symbol of symbols) {
             const result = await step.run(`collect-${symbol}`, async () => {
-                const { collectAdanosSentimentForSymbol } = await import("@/lib/actions/adanos-collect.actions");
                 return collectAdanosSentimentForSymbol(symbol);
             });
 
             totalCollected += result.collected;
             if (result.skipped.length > 0) skipped[symbol] = result.skipped;
+
+            // Pace between symbols: ~1 second gap keeps us well under 100/min.
+            await step.sleep('pace', '1 second');
         }
 
         return {

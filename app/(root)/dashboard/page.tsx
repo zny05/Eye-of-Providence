@@ -5,6 +5,10 @@ import Panel from "@/components/Panel";
 import IndexPulse, { PulseSkeleton } from "@/components/IndexPulse";
 import DataFreshness from "@/components/DataFreshness";
 import MarketSwitcher from "@/components/MarketSwitcher";
+import GroupSelector from "@/components/watchlist/GroupSelector";
+import GroupWatchlistTable from "@/components/watchlist/GroupWatchlistTable";
+import { getWatchlistGroup } from "@/lib/actions/watchlist-group.actions";
+import { getWatchlistData } from "@/lib/actions/finnhub.actions";
 import {
     CRYPTO_HEATMAP_CONFIG,
     STOCK_HEATMAP_CONFIG,
@@ -18,8 +22,8 @@ import { getSession } from "@/lib/better-auth/auth";
 const scriptUrl = `https://s3.tradingview.com/external-embedding/embed-widget-`;
 
 // Widgets come from TradingView (live, no Finnhub quota) and render immediately; the tiles stream in.
-export default async function Dashboard({ searchParams }: { searchParams: Promise<{ market?: string }> }) {
-    const { market: requested } = await searchParams;
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ market?: string; groupId?: string }> }) {
+    const { market: requested, groupId } = await searchParams;
     // Explicit choice, then the remembered one, then the market of the user's country
     const saved = (await cookies()).get(MARKET_COOKIE)?.value;
     const market = getMarket(requested ?? saved ?? marketForCountry((await getSession())?.user.country));
@@ -30,6 +34,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         : market.heatmap === 'crypto'
             ? { script: 'crypto-coins-heatmap.js', config: CRYPTO_HEATMAP_CONFIG, title: 'Crypto heatmap' }
             : null;
+
+    const selectedGroup = await getWatchlistGroup(groupId);
+
+    // Fetch quotes server-side so the client component only handles live quote updates
+    const groupQuotes = selectedGroup?.symbols.length > 0 ? await getWatchlistData(selectedGroup.symbols) : [];
 
     return (
         <>
@@ -54,6 +63,36 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                 <Suspense key={market.id} fallback={<PulseSkeleton />}>
                     <IndexPulse market={market} />
                 </Suspense>
+            </section>
+
+            {/* My Watchlist Groups */}
+            <section className="hatch mt-6">
+                <div className="flex flex-col gap-3">
+                    <div className="section-head">
+                        <h2 className="section-title">我的股票组合</h2>
+                        <p className="section-sub">
+                            在不同组合之间切换，查看该组合下的股票行情。每个组合独立保存，仅对你可见。
+                        </p>
+                    </div>
+                    <GroupSelector currentGroupId={selectedGroup?._id ?? ''} onGroupChange={() => {}} />
+                    {selectedGroup && (
+                        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)]">
+                            <Panel title={selectedGroup.name} sub={`${selectedGroup.symbols.length} 只股票`}>
+                                <Suspense fallback={<div className="h-64 flex items-center justify-center text-faint">加载行情…</div>}>
+                                    <GroupWatchlistTable
+                                        initialRows={groupQuotes}
+                                        groupId={selectedGroup._id}
+                                    />
+                                </Suspense>
+                            </Panel>
+                        </div>
+                    )}
+                    {!selectedGroup && (
+                        <div className="flex items-center justify-center py-16">
+                            <p className="text-faint">正在加载组合…</p>
+                        </div>
+                    )}
+                </div>
             </section>
 
             <div key={market.id} className="flex flex-col gap-3">
