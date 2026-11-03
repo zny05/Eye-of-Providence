@@ -52,6 +52,7 @@ All are `'use server'`. Each begins with `requireUserId()` where appropriate.
 - `alert.actions.ts` — create/get/delete, requires realtime mode, only US stocks / Binance pairs via `hasFinnhubQuotes`.
 - `finnhub.actions.ts` — key pool (comma-separated `FINNHUB_API_KEYS` rotated per request), in-flight request queue (max 2 per key), per-URL deduplication, stale-while-revalidate cache, 429 → next key, failure cool-down (60s). Exports `getQuote`, `getLiveQuotes`, `getCompanyProfile`, `getStockMetrics`, `getWatchlistData`, `getNews`, `searchStocks` (cached; public instance returns `POPULAR_STOCKS` without calling Finnhub, signed-in search hits the API).
 - `adanos.actions.ts`, `profile.actions.ts`, `user.actions.ts` — sentiment card, profile updates, user listing for the news digest.
+  - `adanos.actions.ts` additionally exports `getStockSentimentFromDb(symbol)` (reads latest snapshot per source from `AdanosSentimentSnapshot`, no Adanos API call) and `getStockSentimentInsightsCached(symbol)` (DB-first; falls back to live Adanos API only when no DB data or latest data is older than 48 hours). Use these instead of `getStockSentimentInsights` on stock detail pages to avoid per-page-load Adanos requests.
 
 ### Market data mode
 `lib/market-data.ts` — `DATA_MODE` is `realtime` only when `NEXT_PUBLIC_OPENSTOCK_DATA_MODE=realtime` (fixed at build time). `QUOTE_TTL_SECONDS` = 15s realtime / 3600s cached. `alertsEnabled` follows realtime mode. Markets are defined in `lib/markets.ts` (US, India, Germany, Canada, Australia, Crypto, Forex) with feed freshness and TradingView embed constraints.
@@ -62,6 +63,7 @@ Four functions, all with AI-provider fallback via `callAIProviderWithFallback`:
 - `weekly-news-summary` — cron `0 9 * * 1` (Mon 9AM UTC), Kit broadcast.
 - `check-stock-alerts` — cron `*/5 * * * *`, concurrency 1, claims alerts atomically before emailing (releases claim on failure so the next run retries).
 - `check-inactive-users` — cron `0 10 * * *`, logs intent; 1:1 send not wired up (Kit broadcast would mail the whole list).
+- `collectAdanosSentimentJob` — cron `0 2 * * 2` (weekly Tuesday 02:00 UTC, was daily), concurrency 1, collects every watchlist symbol once per run and writes snapshots to `AdanosSentimentSnapshot`. **Not daily** — the shared Adanos free tier is only 250 requests/month across all endpoints, so weekly cadence preserves quota. Do not change back to daily without verifying remaining quota.
 
 ### AI (`lib/ai-provider.ts`)
 `callAIProvider(prompt, provider?)` — Gemini (REST `generateContent`) or OpenAI-compatible (MiniMax/Siray `chat/completions`). `callAIProviderWithFallback` tries primary (`AI_PROVIDER`, default gemini) then fallback (MiniMax if key set, else Siray; gemini otherwise). Tests stub global `fetch` and assert exact request shape (no unsupported thinking/reasoning parameters).
@@ -120,6 +122,8 @@ docker builder prune -f
 ## Conventions to keep
 - Server actions: validate all input (symbol regex, country/goal/risk/industry against `lib/constants.ts` options), never trust client `userId`, `revalidatePath` after mutations.
 - Finnhub calls go through `fetchJSON` in `finnhub.actions.ts` — never `fetch` Finnhub directly elsewhere; respects the key pool, in-flight queue, and cache.
+- Adanos calls go through `fetchAdanosJSON` in `lib/adanos/fetch.ts` — never `fetch` Adanos directly elsewhere. Respects the API key pool, in-flight queue, per-URL dedup, stale-while-revalidate cache, 429 key rotation, failure cooldown, and monthly-quota circuit breaker (1-hour cooldown when "Monthly API limit exceeded" is detected).
+- Adanos quota is 250 requests/month shared across ALL endpoints. Never schedule Adanos collection more than weekly (`0 2 * * 2`). Stock detail pages should read sentiment from `AdanosSentimentSnapshot` via `getStockSentimentInsightsCached` (DB-first, 48-hour staleness window) instead of calling `getStockSentimentInsights` on every page load.
 - New background jobs: add to `lib/inngest/functions.ts` and register the route in `app/api/inngest`.
 - Tests: Vitest, globals + node environment, `@` aliased to repo root. Stub `fetch` globally; assert exact request URL/headers/body where the action documents it (see `__tests__/ai-provider.test.ts`).
 - Builds set `eslint.ignoreDuringBuilds` and `typescript.ignoreBuildErrors` to true — run `npm run lint` and `npx tsc --noEmit` separately before a PR.
