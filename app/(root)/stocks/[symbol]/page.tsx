@@ -10,14 +10,14 @@ import {
     COMPANY_PROFILE_WIDGET_CONFIG,
     COMPANY_FINANCIALS_WIDGET_CONFIG,
 } from "@/lib/constants";
-import { getStockSentimentInsights } from '@/lib/actions/adanos.actions';
+import { getStockSentimentInsightsCached } from '@/lib/actions/adanos.actions';
 import { getStockMetrics } from '@/lib/actions/finnhub.actions';
 import { formatSymbolForTradingView, isChartEmbeddable, tradingViewSymbolUrl } from '@/lib/utils';
 
 const scriptUrl = `https://s3.tradingview.com/external-embedding/embed-widget-`;
 
 async function Sentiment({ symbol }: { symbol: string }) {
-    const insight = await getStockSentimentInsights(symbol);
+    const insight = await getStockSentimentInsightsCached(symbol);
     if (!insight) return null;
     return (
         <Panel title="Sentiment" sub="Reddit, X.com, news and Polymarket">

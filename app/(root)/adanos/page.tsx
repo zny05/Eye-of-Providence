@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { getUserWatchlist } from "@/lib/actions/watchlist.actions";
-import { getStockSentimentInsights } from "@/lib/actions/adanos.actions";
+import { getStockSentimentInsightsCached } from "@/lib/actions/adanos.actions";
 import { computeMarketConfidenceIndex } from "@/lib/adanos/confidence-index";
 import { AdanosSentimentSnapshot } from "@/database/models/adanos-sentiment.model";
 import { connectToDatabase } from "@/database/mongoose";
@@ -111,7 +111,7 @@ async function SymbolSources({ symbol }: { symbol: string }) {
 }
 
 async function SymbolSentimentCard({ symbol }: { symbol: string }) {
-    const insight = await getStockSentimentInsights(symbol);
+    const insight = await getStockSentimentInsightsCached(symbol);
     if (!insight) return null;
     return <StockSentimentCard insight={insight} />;
 }

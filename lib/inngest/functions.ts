@@ -484,14 +484,14 @@ export const checkInactiveUsers = inngest.createFunction(
 
 /**
  * Collect Adanos sentiment for every symbol on every user's watchlist once per
- * day (02:00 UTC). Runs serially (concurrency 1) so one run finishes before the
+ * week (Tuesday 02:00 UTC). Runs serially (concurrency 1) so one run finishes before the
  * next starts, protecting the shared Adanos free-tier quota (250 requests/month
  * across all endpoints). Results are persisted to AdanosSentimentSnapshot so
  * the Market Confidence Index reads from local history instead of calling Adanos
  * on every page view.
  */
 export const collectAdanosSentimentJob = inngest.createFunction(
-    { id: 'collect-adanos-sentiment', concurrency: 1, triggers: [{ cron: '0 2 * * *' }] }, // Daily 02:00 UTC
+    { id: 'collect-adanos-sentiment', concurrency: 1, triggers: [{ cron: '0 2 * * 2' }] }, // Weekly Tuesday 02:00 UTC
     async ({ step }) => {
         const { connectToDatabase } = await import("@/database/mongoose");
         const mongoose = await connectToDatabase();
