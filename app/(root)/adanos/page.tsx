@@ -68,6 +68,46 @@ async function SymbolSources({ symbol }: { symbol: string }) {
         { $replaceRoot: { newRoot: "$doc" } },
     ]);
 
+    // When MongoDB has no persisted snapshots (e.g. the weekly collection job
+    // hasn't run yet), fall back to the live Adanos API via the cached action
+    // so the overview page isn't blank. This costs Adanos quota, so it is only
+    // a fallback — the weekly job remains the primary data source.
+    if (latest.length === 0) {
+        const cached = await getStockSentimentInsightsCached(symbol);
+        if (!cached || cached.sources.length === 0) {
+            return (
+                <Panel title={symbol} sub="Source breakdown · Adanos sentiment">
+                    <p className="text-[12px] text-faint text-center py-4">
+                        No source data for {symbol} yet. Run the collection job
+                        or open the stock detail page to populate sentiment.
+                    </p>
+                </Panel>
+            );
+        }
+
+        const rows = cached.sources.map((s) => ({
+            source: s.source,
+            label: s.label,
+            buzzScore: s.buzzScore,
+            sentimentScore: null, // aggregate insight does not carry per-source sentimentScore
+            bullishPct: s.bullishPct,
+            bearishPct: null,
+            trend: s.trend,
+            mentions: s.metricValue,
+            collectedAt: new Date(),
+        }));
+
+        return (
+            <Panel title={symbol} sub="Source breakdown · Adanos sentiment (live fallback)">
+                <ul className="row-list border-t border-line">
+                    {rows.map((row) => (
+                        <SentimentSourceRow key={row.source} {...row} />
+                    ))}
+                </ul>
+            </Panel>
+        );
+    }
+
     const rows = (latest as Array<{
         source: string;
         buzzScore: number | null;
@@ -88,16 +128,6 @@ async function SymbolSources({ symbol }: { symbol: string }) {
         mentions: doc.mentions,
         collectedAt: doc.collectedAt,
     }));
-
-    if (rows.length === 0) {
-        return (
-            <Panel title={symbol} sub="Source breakdown · Adanos sentiment">
-                <p className="text-[12px] text-faint text-center py-4">
-                    No source data for {symbol} yet.
-                </p>
-            </Panel>
-        );
-    }
 
     return (
         <Panel title={symbol} sub="Source breakdown · Adanos sentiment">
