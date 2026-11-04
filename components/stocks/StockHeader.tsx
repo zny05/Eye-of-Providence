@@ -16,8 +16,8 @@ async function TradingViewHeader({ symbol }: { symbol: string }) {
     return (
         <section className="hatch">
             <div className="card flex flex-wrap items-center justify-between gap-4 p-4">
-                <div className="min-w-0">
-                    <h1 className="mono truncate text-xl font-bold tracking-[-0.02em]">{symbol}</h1>
+                <div className="min-w-0 break-words">
+                    <h1 className="mono truncate text-xl leading-tight font-bold tracking-[-0.02em]">{symbol}</h1>
                     <p className="text-[12.5px] text-faint">{tvSymbol.split(':')[0]} · quote via TradingView</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -28,7 +28,7 @@ async function TradingViewHeader({ symbol }: { symbol: string }) {
                 </div>
             </div>
             <div className="card mt-[3px] p-1">
-                <TradingViewWidget scriptUrl="https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js" config={symbolInfoConfig(tvSymbol)} height={180} />
+                <TradingViewWidget scriptUrl="https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js" config={symbolInfoConfig(tvSymbol)} height={240} />
             </div>
         </section>
     );
