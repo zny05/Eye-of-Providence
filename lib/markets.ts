@@ -7,7 +7,7 @@
 
 import { isInternationalSymbol } from "@/lib/utils";
 
-export type MarketId = 'us' | 'in' | 'de' | 'ca' | 'au' | 'crypto' | 'fx';
+export type MarketId = 'us' | 'in' | 'de' | 'cn' | 'ca' | 'au' | 'crypto' | 'fx';
 
 type Hours = { open: number; close: number }; // minutes of the local day
 
@@ -70,6 +70,21 @@ export const MARKETS: Market[] = [
             { title: 'Industry', symbols: [['XETR:SIE', 'Siemens'], ['XETR:BAS', 'BASF'], ['XETR:BMW', 'BMW'], ['XETR:MBG', 'Mercedes-Benz'], ['XETR:VOW3', 'Volkswagen']] },
             { title: 'Finance', symbols: [['XETR:ALV', 'Allianz'], ['XETR:MUV2', 'Munich Re'], ['XETR:DBK', 'Deutsche Bank'], ['XETR:CBK', 'Commerzbank']] },
             { title: 'Technology', symbols: [['XETR:SAP', 'SAP'], ['XETR:IFX', 'Infineon'], ['XETR:DTE', 'Deutsche Telekom'], ['XETR:ADS', 'Adidas']] },
+        ],
+        news: 'stock',
+    },
+    {
+        id: 'cn', name: 'China A-Shares', short: 'CN', timeZone: 'Asia/Shanghai', hours: { open: hm(9, 30), close: hm(15) }, feed: 'Delayed',
+        pulse: [
+            { symbol: 'SSE:000001', label: 'Shanghai Composite' },
+            { symbol: 'SZSE:399001', label: 'Shenzhen Component' },
+            { symbol: 'SSE:600519', label: 'Kweichow Moutai' },
+            { symbol: 'SZSE:000858', label: 'Wuliangye' },
+        ],
+        groups: [
+            { title: 'Banks', symbols: [['SSE:601398', 'ICBC'], ['SSE:601939', 'CCB'], ['SSE:600000', 'SPDB'], ['SZSE:000001', 'Ping An Bank']] },
+            { title: 'Technology', symbols: [['SZSE:000938', 'Unisplendour'], ['SSE:603019', 'bombit'], ['SZSE:002230', 'Paysafe'], ['SSE:688111', 'Kingsoft']] },
+            { title: 'Consumer & industrial', symbols: [['SSE:600519', 'Kweichow Moutai'], ['SZSE:000858', 'Wuliangye'], ['SSE:600900', 'Yangtze Power'], ['SSE:601088', 'China Shenhua']] },
         ],
         news: 'stock',
     },
@@ -138,7 +153,7 @@ export const MARKET_COOKIE = 'openstock-market';
 
 export const getMarket = (id?: string | null) => MARKETS.find((m) => m.id === id) ?? MARKETS[0];
 
-const COUNTRY_MARKET: Record<string, MarketId> = { IN: 'in', DE: 'de', CA: 'ca', AU: 'au' };
+const COUNTRY_MARKET: Record<string, MarketId> = { IN: 'in', DE: 'de', CN: 'cn', CA: 'ca', AU: 'au' };
 export const marketForCountry = (country?: string | null): MarketId => COUNTRY_MARKET[country ?? ''] ?? DEFAULT_MARKET;
 
 // Finnhub free can price (and so alert on) US listings and Binance pairs only.

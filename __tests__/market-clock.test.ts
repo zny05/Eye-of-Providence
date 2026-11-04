@@ -37,6 +37,8 @@ describe('markets', () => {
         expect(hasFinnhubQuotes('RELIANCE.NS')).toBe(false);
         expect(hasFinnhubQuotes('BARC.L')).toBe(false);
         expect(hasFinnhubQuotes('7203.T')).toBe(false);
+        expect(hasFinnhubQuotes('600519.SS')).toBe(false);
+        expect(hasFinnhubQuotes('000001.SZ')).toBe(false);
         expect(hasFinnhubQuotes('FX:EURUSD')).toBe(false);
     });
 
@@ -50,5 +52,9 @@ describe('markets', () => {
         expect(isMarketOpen(getMarket('crypto'), new Date('2026-09-26T10:00:00Z'))).toBe(true);
         // FX reopens Sunday 17:00 New York (21:00 UTC in September)
         expect(isMarketOpen(getMarket('fx'), new Date('2026-09-27T21:30:00Z'))).toBe(true);
+        // Wed 2026-09-23 09:30 in Shanghai = 01:30 UTC
+        expect(isMarketOpen(getMarket('cn'), new Date('2026-09-23T01:30:00Z'))).toBe(true);
+        // 15:00 Shanghai close = 07:00 UTC
+        expect(isMarketOpen(getMarket('cn'), new Date('2026-09-23T07:00:00Z'))).toBe(false);
     });
 });

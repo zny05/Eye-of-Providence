@@ -7,6 +7,7 @@ What OpenStock can show depends on two free data sources. This table was tested 
 | 🇺🇸 United States (NYSE, Nasdaq, AMEX) | Live | Yes |
 | Crypto (Binance pairs, e.g. `BINANCE:BTCUSDT`) | Live | Yes |
 | Forex (e.g. `FX:EURUSD`) | Live | No |
+| 🇨🇳 China A-Shares (SSE, SZSE) | Delayed | No |
 | 🇨🇦 Canada (TSX) | Delayed | No |
 | 🇦🇺 Australia (ASX) | Delayed | No |
 | 🇮🇳 India, through BSE (`.BO`; `.NS` symbols are charted on BSE) | End of day | No |
@@ -17,7 +18,7 @@ What OpenStock can show depends on two free data sources. This table was tested 
 
 ## What that means in the app
 
-- **Dashboard:** pick a market (US, India, Germany, Canada, Australia, Crypto, Forex). US and crypto tiles use our own cached quotes; the others use TradingView quote tiles.
+- **Dashboard:** pick a market (US, India, Germany, China A-Shares, Canada, Australia, Crypto, Forex). US and crypto tiles use our own cached quotes; the others use TradingView quote tiles.
 - **Stock pages:** symbols Finnhub can price get the full header (live price, day range, market cap). Others get TradingView's quote panel.
 - **Alerts:** an OpenStock Cloud feature (or self-hosted in realtime mode). US stocks and crypto only, because the alert checker needs a quote source it can call every five minutes.
 - **Search:** Finnhub search returns listings worldwide. On exchanges whose chart is blocked, the stock page links to the chart on TradingView instead (the list is `CHART_BLOCKED_EXCHANGES` in `lib/utils.ts`, each confirmed with two tickers).
