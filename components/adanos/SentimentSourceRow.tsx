@@ -34,6 +34,14 @@ const TREND_CLASS: Record<string, string> = {
     stable: "",
 };
 
+// Adanos 来源品牌色，用于来源名称文本
+const SOURCE_COLOR: Record<string, string> = {
+    reddit: "#D96935",
+    x: "#A4C5FA",
+    polymarket: "#1690FE",
+    news: "#E09B63",
+};
+
 export default function SentimentSourceRow({
     source,
     label,
@@ -52,7 +60,9 @@ export default function SentimentSourceRow({
     return (
         <li className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-3 px-3 py-2.5 border-b border-line last:border-0">
             <div className="min-w-0">
-                <p className="truncate font-semibold text-foreground">{label}</p>
+                <p className="truncate font-semibold" style={{ color: SOURCE_COLOR[source] ?? "var(--foreground)" }}>
+                    {label}
+                </p>
                 <p className="truncate text-[11px] text-faint">
                     {source} · {formatCompactNumber(mentions ?? 0)} {source === "polymarket" ? "trades" : "mentions"}
                 </p>
