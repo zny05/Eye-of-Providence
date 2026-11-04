@@ -78,8 +78,6 @@ export const MARKETS: Market[] = [
         pulse: [
             { symbol: 'SSE:000001', label: 'Shanghai Composite' },
             { symbol: 'SZSE:399001', label: 'Shenzhen Component' },
-            { symbol: 'SSE:600519', label: 'Kweichow Moutai' },
-            { symbol: 'SZSE:000858', label: 'Wuliangye' },
         ],
         groups: [
             { title: 'Banks', symbols: [['SSE:601398', 'ICBC'], ['SSE:601939', 'CCB'], ['SSE:600000', 'SPDB'], ['SZSE:000001', 'Ping An Bank']] },
