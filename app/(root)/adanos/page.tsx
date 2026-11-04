@@ -24,6 +24,7 @@ async function SymbolMci({ symbol }: { symbol: string }) {
 
     return (
         <Panel
+            className="bento-cell"
             title={symbol}
             sub="Market Confidence Index · Adanos sentiment"
             action={
@@ -221,7 +222,7 @@ export default async function AdanosPage() {
                     ) : (
                         symbols.slice(0, 4).map((symbol) => (
                             <Suspense key={symbol} fallback={null}>
-                                <Panel title={symbol} sub="Sentiment (live via Adanos API)">
+                                <Panel className="bento-cell" title={symbol} sub="Sentiment (live via Adanos API)">
                                     <SymbolSentimentCard symbol={symbol} />
                                 </Panel>
                             </Suspense>
