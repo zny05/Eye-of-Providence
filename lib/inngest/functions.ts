@@ -482,6 +482,9 @@ export const checkInactiveUsers = inngest.createFunction(
     }
 );
 
+// If DB sentiment data is older than this, the weekly job will re-collect for that symbol.
+const ADANOS_COLLECTION_STALENESS_WINDOW_MS = 48 * 60 * 60 * 1000;
+
 /**
  * Collect Adanos sentiment for every symbol on every user's watchlist once per
  * week (Tuesday 02:00 UTC). Runs serially (concurrency 1) so one run finishes before the
@@ -489,19 +492,42 @@ export const checkInactiveUsers = inngest.createFunction(
  * across all endpoints). Results are persisted to AdanosSentimentSnapshot so
  * the Market Confidence Index reads from local history instead of calling Adanos
  * on every page view.
+ *
+ * Before collecting each symbol, checks whether the latest persisted snapshot is
+ * older than 48 hours (or missing). Symbols with fresh data are skipped entirely,
+ * so the weekly job does not re-fetch symbols that already have recent snapshots
+ * — further preserving the shared 250/month Adanos quota.
  */
 export const collectAdanosSentimentJob = inngest.createFunction(
     { id: 'collect-adanos-sentiment', concurrency: 1, triggers: [{ cron: '0 2 * * 2' }] }, // Weekly Tuesday 02:00 UTC
     async ({ step }) => {
         const { connectToDatabase } = await import("@/database/mongoose");
         const mongoose = await connectToDatabase();
-        const db = mongoose.connection.db;
-        if (!db) throw new Error("No DB Connection");
+        const { AdanosSentimentSnapshot } = await import("@/database/models/adanos-sentiment.model");
 
         // Every symbol present on any user's watchlist, collected once regardless of owner.
-        const symbols = (await db.collection('watchlists').distinct('symbol')).filter(
-            (s): s is string => typeof s === 'string',
+        const db = mongoose.connection.db;
+        if (!db) throw new Error("No DB Connection");
+        const allSymbols = (await db.collection('watchlists').distinct('symbol')).filter(
+            (s: unknown): s is string => typeof s === 'string',
         );
+
+        // Latest collectedAt per symbol across all sources (used for staleness check).
+        const watchlistSymbols = await AdanosSentimentSnapshot.aggregate([
+            { $group: { _id: '$symbol', latest: { $max: '$collectedAt' } } },
+        ]) as Array<{ _id: string; latest: Date | null }>;
+
+        const latestBySymbol = new Map<string, Date | null>();
+        for (const entry of watchlistSymbols) {
+            latestBySymbol.set(entry._id, entry.latest);
+        }
+
+        // Filter to only symbols whose data is missing or older than 48 hours.
+        const now = Date.now();
+        const symbolsToCollect = allSymbols.filter((symbol: string) => {
+            const latest = latestBySymbol.get(symbol);
+            return !latest || now - latest.getTime() > ADANOS_COLLECTION_STALENESS_WINDOW_MS;
+        });
 
         let totalCollected = 0;
         const skipped: Record<string, string[]> = {};
@@ -509,7 +535,7 @@ export const collectAdanosSentimentJob = inngest.createFunction(
         // Process symbols serially with a small delay between each to avoid bursting Adanos'
         // 100/min rate limit. Inngest's concurrency: 1 already serializes runs, but within
         // one run we still need to pace per-symbol requests.
-        for (const symbol of symbols) {
+        for (const symbol of symbolsToCollect) {
             const result = await step.run(`collect-${symbol}`, async () => {
                 return collectAdanosSentimentForSymbol(symbol);
             });
@@ -521,10 +547,14 @@ export const collectAdanosSentimentJob = inngest.createFunction(
             await step.sleep('pace', '1 second');
         }
 
+        const skippedFresh = allSymbols.filter((s: string) => !symbolsToCollect.includes(s));
+
         return {
-            symbols: symbols.length,
+            symbols: allSymbols.length,
             collected: totalCollected,
-            skipped,
+            skipped: { ...skipped, 'fresh-data-skipped': skippedFresh },
+            collectedSymbols: symbolsToCollect.length,
+            skippedFreshCount: skippedFresh.length,
         };
     }
 );
