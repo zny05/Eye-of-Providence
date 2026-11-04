@@ -482,12 +482,12 @@ export const checkInactiveUsers = inngest.createFunction(
     }
 );
 
-// If DB sentiment data is older than this, the weekly job will re-collect for that symbol.
+// If DB sentiment data is older than this, the collection job will re-collect for that symbol.
 const ADANOS_COLLECTION_STALENESS_WINDOW_MS = 48 * 60 * 60 * 1000;
 
 /**
- * Collect Adanos sentiment for every symbol on every user's watchlist once per
- * week (Tuesday 02:00 UTC). Runs serially (concurrency 1) so one run finishes before the
+ * Collect Adanos sentiment for every symbol on every user's watchlist twice per
+ * month (8th and 24th at 02:00 UTC). Runs serially (concurrency 1) so one run finishes before the
  * next starts, protecting the shared Adanos free-tier quota (250 requests/month
  * across all endpoints). Results are persisted to AdanosSentimentSnapshot so
  * the Market Confidence Index reads from local history instead of calling Adanos
@@ -495,11 +495,11 @@ const ADANOS_COLLECTION_STALENESS_WINDOW_MS = 48 * 60 * 60 * 1000;
  *
  * Before collecting each symbol, checks whether the latest persisted snapshot is
  * older than 48 hours (or missing). Symbols with fresh data are skipped entirely,
- * so the weekly job does not re-fetch symbols that already have recent snapshots
+ * so the job does not re-fetch symbols that already have recent snapshots
  * — further preserving the shared 250/month Adanos quota.
  */
 export const collectAdanosSentimentJob = inngest.createFunction(
-    { id: 'collect-adanos-sentiment', concurrency: 1, triggers: [{ cron: '0 2 * * 2' }] }, // Weekly Tuesday 02:00 UTC
+    { id: 'collect-adanos-sentiment', concurrency: 1, triggers: [{ cron: '0 2 8,24 * *' }] }, // Monthly 8th & 24th 02:00 UTC
     async ({ step }) => {
         const { connectToDatabase } = await import("@/database/mongoose");
         const mongoose = await connectToDatabase();
