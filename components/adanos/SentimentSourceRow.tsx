@@ -67,7 +67,7 @@ export default function SentimentSourceRow({
                 </p>
                 <p className="text-[11px] text-faint">{sentimentLabel}</p>
             </div>
-            <span className={cn('pill w-[72px] justify-center capitalize', trendClass)}>
+            <span className={cn('pill w-[96px] justify-center capitalize', trendClass)}>
                 {trend !== null ? `${trend}` : "—"}
             </span>
         </li>

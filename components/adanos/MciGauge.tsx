@@ -52,8 +52,8 @@ export default function MciGauge({ mci, label = "Market confidence" }: MciGaugeP
 
     return (
         <div className="bento-tile p-3">
-            <div className="flex items-end gap-2 mb-1">
-                <span className="kicker">{label}</span>
+            <div className="flex items-end gap-2 mb-1 min-w-0">
+                <span className="kicker truncate min-w-0">{label}</span>
                 <span className="ml-auto text-[12px] text-faint">{verdict}</span>
             </div>
             <div className="relative h-8 w-full rounded-full overflow-hidden border border-line mb-2">

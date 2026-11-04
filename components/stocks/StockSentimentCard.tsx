@@ -68,7 +68,7 @@ export default function StockSentimentCard({ insight }: StockSentimentCardProps)
                             <p className="font-semibold text-foreground">{formatScore(source.buzzScore, '')}</p>
                             <p className="text-faint">buzz</p>
                         </div>
-                        <span className={cn('pill w-[74px] justify-center capitalize', TREND_CLASS[source.trend ?? ''])}>
+                        <span className={cn('pill w-[96px] justify-center capitalize', TREND_CLASS[source.trend ?? ''])}>
                             {source.bullishPct !== null ? `${source.bullishPct.toFixed(0)}% bull` : (source.trend ?? 'No trend')}
                         </span>
                     </li>
