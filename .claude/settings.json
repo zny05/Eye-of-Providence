@@ -14,7 +14,20 @@
       "Bash(ls -la \"C:\\\\Users\\\\HadesCanyon\\\\.claude\\\\projects\\\\c--Users-HadesCanyon-Downloads-Eye-of-Providence\\\\memory/\" 2>/dev/null)",
       "Bash(ls \"C:\\\\Users\\\\HadesCanyon\\\\.claude\\\\projects\\\\c--Users-HadesCanyon-Downloads-Eye-of-Providence/MEMORY.md\" 2>/dev/null || echo \"no MEMORY.md\")",
       "Bash(npx vitest *)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(firecrawl --version)",
+      "Bash(firecrawl --help)",
+      "Bash(firecrawl search *)",
+      "Bash(firecrawl scrape *)",
+      "Bash(firecrawl status *)",
+      "Bash(firecrawl credits *)",
+      "Bash(firecrawl doctor *)",
+      "Bash(ls /c/Users/HadesCanyon/.claude/projects/c--Users-HadesCanyon-Downloads-Eye-of-Providence/5dcaa46c-a8bc-4105-9f37-66f51346913d/tool-results/)",
+      "Read(//c/Users/HadesCanyon/.claude/projects/c--Users-HadesCanyon-Downloads-Eye-of-Providence/5dcaa46c-a8bc-4105-9f37-66f51346913d/tool-results//**)",
+      "Bash(cat /c/Users/HadesCanyon/.claude/projects/c--Users-HadesCanyon-Downloads-Eye-of-Providence/5dcaa46c-a8bc-4105-9f37-66f51346913d/tool-results/bihqoni05.txt | head -c 10000)",
+      "Read(//c/Users/HadesCanyon/.claude/projects/c--Users-HadesCanyon-Downloads-Eye-of-Providence/5dcaa46c-a8bc-4105-9f37-66f51346913d/tool-results/**)",
+      "Skill(firecrawl)",
+      "Skill(firecrawl:*)"
     ],
     "additionalDirectories": [
       "C:\\Users\\HadesCanyon\\.claude\\projects\\c--Users-HadesCanyon-Downloads-Eye-of-Providence"

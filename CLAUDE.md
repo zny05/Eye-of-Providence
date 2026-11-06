@@ -32,7 +32,7 @@ OpenStock — a free, open-source market data platform (Next.js 15 App Router, R
 ### Routing (Next.js App Router, route groups)
 - `app/(marketing)/` — public pages: landing, about, help, api-docs, sponsor, love, changelog, `/s/[ticker]`, `/compare`
 - `app/(auth)/` — sign-in, sign-up, forgot-password, reset-password
-- `app/(root)/` — signed-in app: dashboard, watchlist, `stocks/[symbol]`, profile (middleware redirects to sign-in when no session)
+- `app/(root)/` — signed-in app: dashboard, watchlist, `stocks/[symbol]`, profile, `eye` (middleware redirects to sign-in when no session)
 - `app/api/` — `auth/[...all]` (Better Auth), `inngest` (background jobs), `quotes` (live prices)
 
 `middleware.ts` uses `isPublicPath` from `lib/public-paths.ts` to let marketing/public pages through unauthenticated; everything else requires the session cookie. Public checks are whole-segment (`/s` does not unlock `/stocks` or `/sponsor`).
@@ -56,6 +56,9 @@ All are `'use server'`. Each begins with `requireUserId()` where appropriate.
 
 ### Market data mode
 `lib/market-data.ts` — `DATA_MODE` is `realtime` only when `NEXT_PUBLIC_OPENSTOCK_DATA_MODE=realtime` (fixed at build time). `QUOTE_TTL_SECONDS` = 15s realtime / 3600s cached. `alertsEnabled` follows realtime mode. Markets are defined in `lib/markets.ts` (US, India, Germany, China A-Shares, Canada, Australia, Crypto, Forex) with feed freshness and TradingView embed constraints. China A-Shares was added 2026-11-04 as a TradingView-embed-only market (Tier 1): `MarketId` + entry in `lib/markets.ts`, `CN: 'cn'` in `COUNTRY_MARKET`, SSE/SZSE symbols already mapped in `lib/utils.ts`; no Finnhub quotes/alerts. `cn` pulse currently contains only the two indices `SSE:000001` (Shanghai Composite) / `SZSE:399001` (Shenzhen Component) after removing the initial `SSE:600519` / `SZSE:000858` tiles (K-line embeds verified working for `600519.SS`; A-share stocks remain in `groups`).
+
+### Eye of Omniscience (`/eye`)
+Vertical-flow parallel coordinates (each axis is a horizontal track, axes stack top to bottom). Spec: `docs/全视之眼_高维平行坐标图分析模块_总体规划方案.md` §10. Pure logic lives in `lib/eye/` (geometry, brush, categorical layout, hit test, URL state, percentile scoring) and is unit-tested in `__tests__/eye-*.test.ts`; UI in `components/eye/` (Canvas for lines, DOM for axis rows). Industry data comes from `lib/eye/registry/industries.json`, generated and validated by `node scripts/build-eye-registry.mjs` from the knowledge base. Stock fundamentals use `getStockFactorMetrics` in `finnhub.actions.ts`, which reuses the `metric=all` URL/cache of `getStockMetrics`; never fetch Finnhub elsewhere. The module reads no Adanos data. Finnhub field names are unverified; axes are marked `unverified` until checked.
 
 ### Background jobs (`lib/inngest/functions.ts`)
 Four functions, all with AI-provider fallback via `callAIProviderWithFallback`:

@@ -14,6 +14,7 @@ const MAX_TABS = 12;
 const PAGE_LABELS: Record<string, string> = {
     '/dashboard': 'Overview',
     '/watchlist': 'Watchlist',
+    '/eye': 'Eye of Omniscience',
     '/profile': 'Profile',
 };
 

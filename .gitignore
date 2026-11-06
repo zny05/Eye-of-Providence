@@ -20,6 +20,8 @@
 # production
 /build
 /docs
+/.firecrawl
+/.claude
 
 # misc
 .DS_Store
@@ -44,3 +46,4 @@ next-env.d.ts
 
 # local development
 Eye-of-Providence.code-workspace
+.claude/settings.json

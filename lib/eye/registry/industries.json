@@ -1,0 +1,1893 @@
+{
+  "version": "kb-2026-11-06",
+  "sectors": [
+    {
+      "id": "basic-materials",
+      "en": "Basic Materials",
+      "zh": "基础材料",
+      "count": 13
+    },
+    {
+      "id": "communication-services",
+      "en": "Communication Services",
+      "zh": "通信服务",
+      "count": 5
+    },
+    {
+      "id": "consumer-cyclical",
+      "en": "Consumer Cyclical",
+      "zh": "周期性消费",
+      "count": 17
+    },
+    {
+      "id": "consumer-defensive",
+      "en": "Consumer Defensive",
+      "zh": "防御性消费",
+      "count": 10
+    },
+    {
+      "id": "energy",
+      "en": "Energy",
+      "zh": "能源",
+      "count": 8
+    },
+    {
+      "id": "financial",
+      "en": "Financial",
+      "zh": "金融",
+      "count": 14
+    },
+    {
+      "id": "healthcare",
+      "en": "Healthcare",
+      "zh": "医疗保健",
+      "count": 10
+    },
+    {
+      "id": "industrials",
+      "en": "Industrials",
+      "zh": "工业",
+      "count": 22
+    },
+    {
+      "id": "real-estate",
+      "en": "Real Estate",
+      "zh": "房地产",
+      "count": 12
+    },
+    {
+      "id": "technology",
+      "en": "Technology",
+      "zh": "科技",
+      "count": 13
+    },
+    {
+      "id": "utilities",
+      "en": "Utilities",
+      "zh": "公用事业",
+      "count": 6
+    }
+  ],
+  "industries": [
+    {
+      "profileId": "agricultural-inputs",
+      "sector": "basic-materials",
+      "name": "Agricultural Inputs",
+      "weights": {
+        "DEM": 20,
+        "RATE": 8,
+        "COST": 28,
+        "LAB": 8,
+        "POLICY": 16,
+        "SPEC": 20
+      },
+      "packId": "AGRI"
+    },
+    {
+      "profileId": "aluminum",
+      "sector": "basic-materials",
+      "name": "Aluminum",
+      "weights": {
+        "DEM": 20,
+        "RATE": 8,
+        "COST": 35,
+        "LAB": 10,
+        "POLICY": 12,
+        "SPEC": 15
+      },
+      "packId": "METAL"
+    },
+    {
+      "profileId": "building-materials",
+      "sector": "basic-materials",
+      "name": "Building Materials",
+      "weights": {
+        "DEM": 25,
+        "RATE": 18,
+        "COST": 20,
+        "LAB": 10,
+        "POLICY": 10,
+        "SPEC": 17
+      },
+      "packId": "MATERIALS"
+    },
+    {
+      "profileId": "chemicals",
+      "sector": "basic-materials",
+      "name": "Chemicals",
+      "weights": {
+        "DEM": 22,
+        "RATE": 10,
+        "COST": 32,
+        "LAB": 10,
+        "POLICY": 12,
+        "SPEC": 14
+      },
+      "packId": "CHEM"
+    },
+    {
+      "profileId": "coking-coal",
+      "sector": "basic-materials",
+      "name": "Coking Coal",
+      "weights": {
+        "DEM": 18,
+        "RATE": 8,
+        "COST": 38,
+        "LAB": 8,
+        "POLICY": 18,
+        "SPEC": 10
+      },
+      "packId": "ENERGY"
+    },
+    {
+      "profileId": "copper",
+      "sector": "basic-materials",
+      "name": "Copper",
+      "weights": {
+        "DEM": 24,
+        "RATE": 10,
+        "COST": 36,
+        "LAB": 8,
+        "POLICY": 10,
+        "SPEC": 12
+      },
+      "packId": "METAL"
+    },
+    {
+      "profileId": "gold",
+      "sector": "basic-materials",
+      "name": "Gold",
+      "weights": {
+        "DEM": 12,
+        "RATE": 27,
+        "COST": 10,
+        "LAB": 6,
+        "POLICY": 12,
+        "SPEC": 33
+      },
+      "packId": "METAL"
+    },
+    {
+      "profileId": "lumber-and-wood-production",
+      "sector": "basic-materials",
+      "name": "Lumber & Wood Production",
+      "weights": {
+        "DEM": 25,
+        "RATE": 18,
+        "COST": 28,
+        "LAB": 8,
+        "POLICY": 8,
+        "SPEC": 13
+      },
+      "packId": "MATERIALS"
+    },
+    {
+      "profileId": "other-industrial-metals-and-mining",
+      "sector": "basic-materials",
+      "name": "Other Industrial Metals & Mining",
+      "weights": {
+        "DEM": 22,
+        "RATE": 10,
+        "COST": 35,
+        "LAB": 8,
+        "POLICY": 12,
+        "SPEC": 13
+      },
+      "packId": "METAL"
+    },
+    {
+      "profileId": "other-precious-metals-and-mining",
+      "sector": "basic-materials",
+      "name": "Other Precious Metals & Mining",
+      "weights": {
+        "DEM": 12,
+        "RATE": 25,
+        "COST": 22,
+        "LAB": 8,
+        "POLICY": 15,
+        "SPEC": 18
+      },
+      "packId": "METAL"
+    },
+    {
+      "profileId": "silver",
+      "sector": "basic-materials",
+      "name": "Silver",
+      "weights": {
+        "DEM": 18,
+        "RATE": 22,
+        "COST": 24,
+        "LAB": 8,
+        "POLICY": 12,
+        "SPEC": 16
+      },
+      "packId": "METAL"
+    },
+    {
+      "profileId": "specialty-chemicals",
+      "sector": "basic-materials",
+      "name": "Specialty Chemicals",
+      "weights": {
+        "DEM": 25,
+        "RATE": 12,
+        "COST": 26,
+        "LAB": 12,
+        "POLICY": 12,
+        "SPEC": 13
+      },
+      "packId": "CHEM"
+    },
+    {
+      "profileId": "steel",
+      "sector": "basic-materials",
+      "name": "Steel",
+      "weights": {
+        "DEM": 24,
+        "RATE": 10,
+        "COST": 32,
+        "LAB": 10,
+        "POLICY": 12,
+        "SPEC": 12
+      },
+      "packId": "METAL"
+    },
+    {
+      "profileId": "advertising-agencies",
+      "sector": "communication-services",
+      "name": "Advertising Agencies",
+      "weights": {
+        "DEM": 32,
+        "RATE": 15,
+        "COST": 5,
+        "LAB": 15,
+        "POLICY": 10,
+        "SPEC": 23
+      },
+      "packId": "AD"
+    },
+    {
+      "profileId": "broadcasting",
+      "sector": "communication-services",
+      "name": "Broadcasting",
+      "weights": {
+        "DEM": 24,
+        "RATE": 20,
+        "COST": 8,
+        "LAB": 12,
+        "POLICY": 16,
+        "SPEC": 20
+      },
+      "packId": "MEDIA"
+    },
+    {
+      "profileId": "entertainment",
+      "sector": "communication-services",
+      "name": "Entertainment",
+      "weights": {
+        "DEM": 30,
+        "RATE": 16,
+        "COST": 8,
+        "LAB": 15,
+        "POLICY": 12,
+        "SPEC": 19
+      },
+      "packId": "MEDIA"
+    },
+    {
+      "profileId": "internet-content-and-information",
+      "sector": "communication-services",
+      "name": "Internet Content & Information",
+      "weights": {
+        "DEM": 28,
+        "RATE": 22,
+        "COST": 5,
+        "LAB": 15,
+        "POLICY": 15,
+        "SPEC": 15
+      },
+      "packId": "MEDIA"
+    },
+    {
+      "profileId": "telecom-services",
+      "sector": "communication-services",
+      "name": "Telecom Services",
+      "weights": {
+        "DEM": 20,
+        "RATE": 27,
+        "COST": 12,
+        "LAB": 12,
+        "POLICY": 18,
+        "SPEC": 11
+      },
+      "packId": "TELECOM"
+    },
+    {
+      "profileId": "apparel-manufacturing",
+      "sector": "consumer-cyclical",
+      "name": "Apparel Manufacturing",
+      "weights": {
+        "DEM": 30,
+        "RATE": 12,
+        "COST": 20,
+        "LAB": 14,
+        "POLICY": 8,
+        "SPEC": 16
+      },
+      "packId": "APPAREL"
+    },
+    {
+      "profileId": "apparel-retail",
+      "sector": "consumer-cyclical",
+      "name": "Apparel Retail",
+      "weights": {
+        "DEM": 36,
+        "RATE": 12,
+        "COST": 10,
+        "LAB": 16,
+        "POLICY": 8,
+        "SPEC": 18
+      },
+      "packId": "APPAREL"
+    },
+    {
+      "profileId": "auto-and-truck-dealerships",
+      "sector": "consumer-cyclical",
+      "name": "Auto & Truck Dealerships",
+      "weights": {
+        "DEM": 35,
+        "RATE": 22,
+        "COST": 8,
+        "LAB": 12,
+        "POLICY": 10,
+        "SPEC": 13
+      },
+      "packId": "AUTO"
+    },
+    {
+      "profileId": "auto-manufacturers",
+      "sector": "consumer-cyclical",
+      "name": "Auto Manufacturers",
+      "weights": {
+        "DEM": 32,
+        "RATE": 22,
+        "COST": 16,
+        "LAB": 10,
+        "POLICY": 12,
+        "SPEC": 8
+      },
+      "packId": "AUTO"
+    },
+    {
+      "profileId": "auto-parts",
+      "sector": "consumer-cyclical",
+      "name": "Auto Parts",
+      "weights": {
+        "DEM": 28,
+        "RATE": 15,
+        "COST": 18,
+        "LAB": 14,
+        "POLICY": 8,
+        "SPEC": 17
+      },
+      "packId": "AUTO"
+    },
+    {
+      "profileId": "department-stores",
+      "sector": "consumer-cyclical",
+      "name": "Department Stores",
+      "weights": {
+        "DEM": 38,
+        "RATE": 14,
+        "COST": 8,
+        "LAB": 16,
+        "POLICY": 8,
+        "SPEC": 16
+      },
+      "packId": "RETAIL"
+    },
+    {
+      "profileId": "footwear-and-accessories",
+      "sector": "consumer-cyclical",
+      "name": "Footwear & Accessories",
+      "weights": {
+        "DEM": 34,
+        "RATE": 12,
+        "COST": 12,
+        "LAB": 14,
+        "POLICY": 8,
+        "SPEC": 20
+      },
+      "packId": "APPAREL"
+    },
+    {
+      "profileId": "furnishings-fixtures-and-appliances",
+      "sector": "consumer-cyclical",
+      "name": "Furnishings, Fixtures & Appliances",
+      "weights": {
+        "DEM": 30,
+        "RATE": 23,
+        "COST": 14,
+        "LAB": 12,
+        "POLICY": 10,
+        "SPEC": 11
+      },
+      "packId": "RETAIL"
+    },
+    {
+      "profileId": "gambling",
+      "sector": "consumer-cyclical",
+      "name": "Gambling",
+      "weights": {
+        "DEM": 34,
+        "RATE": 18,
+        "COST": 10,
+        "LAB": 13,
+        "POLICY": 15,
+        "SPEC": 10
+      },
+      "packId": "GAMING"
+    },
+    {
+      "profileId": "home-improvement-retail",
+      "sector": "consumer-cyclical",
+      "name": "Home Improvement Retail",
+      "weights": {
+        "DEM": 34,
+        "RATE": 24,
+        "COST": 10,
+        "LAB": 12,
+        "POLICY": 8,
+        "SPEC": 12
+      },
+      "packId": "REAL_ESTATE"
+    },
+    {
+      "profileId": "internet-retail",
+      "sector": "consumer-cyclical",
+      "name": "Internet Retail",
+      "weights": {
+        "DEM": 38,
+        "RATE": 18,
+        "COST": 10,
+        "LAB": 12,
+        "POLICY": 8,
+        "SPEC": 14
+      },
+      "packId": "RETAIL"
+    },
+    {
+      "profileId": "leisure",
+      "sector": "consumer-cyclical",
+      "name": "Leisure",
+      "weights": {
+        "DEM": 32,
+        "RATE": 16,
+        "COST": 10,
+        "LAB": 16,
+        "POLICY": 10,
+        "SPEC": 16
+      },
+      "packId": "TRAVEL"
+    },
+    {
+      "profileId": "lodging",
+      "sector": "consumer-cyclical",
+      "name": "Lodging",
+      "weights": {
+        "DEM": 30,
+        "RATE": 19,
+        "COST": 12,
+        "LAB": 16,
+        "POLICY": 10,
+        "SPEC": 13
+      },
+      "packId": "LODGING"
+    },
+    {
+      "profileId": "recreational-vehicles",
+      "sector": "consumer-cyclical",
+      "name": "Recreational Vehicles",
+      "weights": {
+        "DEM": 34,
+        "RATE": 22,
+        "COST": 14,
+        "LAB": 10,
+        "POLICY": 8,
+        "SPEC": 12
+      },
+      "packId": "AUTO"
+    },
+    {
+      "profileId": "restaurants",
+      "sector": "consumer-cyclical",
+      "name": "Restaurants",
+      "weights": {
+        "DEM": 35,
+        "RATE": 12,
+        "COST": 20,
+        "LAB": 18,
+        "POLICY": 8,
+        "SPEC": 7
+      },
+      "packId": "FOOD"
+    },
+    {
+      "profileId": "specialty-retail",
+      "sector": "consumer-cyclical",
+      "name": "Specialty Retail",
+      "weights": {
+        "DEM": 35,
+        "RATE": 14,
+        "COST": 12,
+        "LAB": 15,
+        "POLICY": 8,
+        "SPEC": 16
+      },
+      "packId": "RETAIL"
+    },
+    {
+      "profileId": "travel-services",
+      "sector": "consumer-cyclical",
+      "name": "Travel Services",
+      "weights": {
+        "DEM": 36,
+        "RATE": 18,
+        "COST": 10,
+        "LAB": 12,
+        "POLICY": 10,
+        "SPEC": 14
+      },
+      "packId": "TRAVEL"
+    },
+    {
+      "profileId": "beverages-brewers",
+      "sector": "consumer-defensive",
+      "name": "Beverages - Brewers",
+      "weights": {
+        "DEM": 25,
+        "RATE": 12,
+        "COST": 22,
+        "LAB": 12,
+        "POLICY": 14,
+        "SPEC": 15
+      },
+      "packId": "FOOD"
+    },
+    {
+      "profileId": "beverages-non-alcoholic",
+      "sector": "consumer-defensive",
+      "name": "Beverages - Non-Alcoholic",
+      "weights": {
+        "DEM": 25,
+        "RATE": 12,
+        "COST": 24,
+        "LAB": 14,
+        "POLICY": 12,
+        "SPEC": 13
+      },
+      "packId": "FOOD"
+    },
+    {
+      "profileId": "beverages-wineries-and-distilleries",
+      "sector": "consumer-defensive",
+      "name": "Beverages - Wineries & Distilleries",
+      "weights": {
+        "DEM": 26,
+        "RATE": 13,
+        "COST": 20,
+        "LAB": 12,
+        "POLICY": 18,
+        "SPEC": 11
+      },
+      "packId": "FOOD"
+    },
+    {
+      "profileId": "confectioners",
+      "sector": "consumer-defensive",
+      "name": "Confectioners",
+      "weights": {
+        "DEM": 27,
+        "RATE": 12,
+        "COST": 24,
+        "LAB": 12,
+        "POLICY": 12,
+        "SPEC": 13
+      },
+      "packId": "FOOD"
+    },
+    {
+      "profileId": "discount-stores",
+      "sector": "consumer-defensive",
+      "name": "Discount Stores",
+      "weights": {
+        "DEM": 32,
+        "RATE": 12,
+        "COST": 12,
+        "LAB": 18,
+        "POLICY": 10,
+        "SPEC": 16
+      },
+      "packId": "RETAIL"
+    },
+    {
+      "profileId": "food-distribution",
+      "sector": "consumer-defensive",
+      "name": "Food Distribution",
+      "weights": {
+        "DEM": 28,
+        "RATE": 10,
+        "COST": 22,
+        "LAB": 16,
+        "POLICY": 12,
+        "SPEC": 12
+      },
+      "packId": "FOOD"
+    },
+    {
+      "profileId": "grocery-stores",
+      "sector": "consumer-defensive",
+      "name": "Grocery Stores",
+      "weights": {
+        "DEM": 30,
+        "RATE": 11,
+        "COST": 18,
+        "LAB": 18,
+        "POLICY": 10,
+        "SPEC": 13
+      },
+      "packId": "FOOD"
+    },
+    {
+      "profileId": "household-and-personal-products",
+      "sector": "consumer-defensive",
+      "name": "Household & Personal Products",
+      "weights": {
+        "DEM": 28,
+        "RATE": 12,
+        "COST": 20,
+        "LAB": 12,
+        "POLICY": 15,
+        "SPEC": 13
+      },
+      "packId": "FOOD"
+    },
+    {
+      "profileId": "packaged-foods",
+      "sector": "consumer-defensive",
+      "name": "Packaged Foods",
+      "weights": {
+        "DEM": 28,
+        "RATE": 12,
+        "COST": 25,
+        "LAB": 14,
+        "POLICY": 12,
+        "SPEC": 9
+      },
+      "packId": "FOOD"
+    },
+    {
+      "profileId": "tobacco",
+      "sector": "consumer-defensive",
+      "name": "Tobacco",
+      "weights": {
+        "DEM": 20,
+        "RATE": 18,
+        "COST": 12,
+        "LAB": 8,
+        "POLICY": 30,
+        "SPEC": 12
+      },
+      "packId": "FOOD"
+    },
+    {
+      "profileId": "oil-and-gas-drilling",
+      "sector": "energy",
+      "name": "Oil & Gas Drilling",
+      "weights": {
+        "DEM": 22,
+        "RATE": 12,
+        "COST": 24,
+        "LAB": 12,
+        "POLICY": 20,
+        "SPEC": 10
+      },
+      "packId": "ENERGY"
+    },
+    {
+      "profileId": "oil-and-gas-e-and-p",
+      "sector": "energy",
+      "name": "Oil & Gas E&P",
+      "weights": {
+        "DEM": 20,
+        "RATE": 10,
+        "COST": 34,
+        "LAB": 10,
+        "POLICY": 16,
+        "SPEC": 10
+      },
+      "packId": "ENERGY"
+    },
+    {
+      "profileId": "oil-and-gas-equipment-and-services",
+      "sector": "energy",
+      "name": "Oil & Gas Equipment & Services",
+      "weights": {
+        "DEM": 25,
+        "RATE": 14,
+        "COST": 18,
+        "LAB": 15,
+        "POLICY": 16,
+        "SPEC": 12
+      },
+      "packId": "ENERGY"
+    },
+    {
+      "profileId": "oil-and-gas-integrated",
+      "sector": "energy",
+      "name": "Oil & Gas Integrated",
+      "weights": {
+        "DEM": 22,
+        "RATE": 12,
+        "COST": 28,
+        "LAB": 10,
+        "POLICY": 18,
+        "SPEC": 10
+      },
+      "packId": "ENERGY"
+    },
+    {
+      "profileId": "oil-and-gas-midstream",
+      "sector": "energy",
+      "name": "Oil & Gas Midstream",
+      "weights": {
+        "DEM": 20,
+        "RATE": 25,
+        "COST": 18,
+        "LAB": 12,
+        "POLICY": 15,
+        "SPEC": 10
+      },
+      "packId": "ENERGY"
+    },
+    {
+      "profileId": "oil-and-gas-refining-and-marketing",
+      "sector": "energy",
+      "name": "Oil & Gas Refining & Marketing",
+      "weights": {
+        "DEM": 23,
+        "RATE": 12,
+        "COST": 30,
+        "LAB": 12,
+        "POLICY": 13,
+        "SPEC": 10
+      },
+      "packId": "ENERGY"
+    },
+    {
+      "profileId": "thermal-coal",
+      "sector": "energy",
+      "name": "Thermal Coal",
+      "weights": {
+        "DEM": 18,
+        "RATE": 10,
+        "COST": 30,
+        "LAB": 10,
+        "POLICY": 24,
+        "SPEC": 8
+      },
+      "packId": "ENERGY"
+    },
+    {
+      "profileId": "uranium",
+      "sector": "energy",
+      "name": "Uranium",
+      "weights": {
+        "DEM": 18,
+        "RATE": 14,
+        "COST": 22,
+        "LAB": 10,
+        "POLICY": 26,
+        "SPEC": 10
+      },
+      "packId": "ENERGY"
+    },
+    {
+      "profileId": "asset-management",
+      "sector": "financial",
+      "name": "Asset Management",
+      "weights": {
+        "DEM": 25,
+        "RATE": 24,
+        "COST": 5,
+        "LAB": 10,
+        "POLICY": 18,
+        "SPEC": 18
+      },
+      "packId": "BANK"
+    },
+    {
+      "profileId": "banks-diversified",
+      "sector": "financial",
+      "name": "Banks - Diversified",
+      "weights": {
+        "DEM": 24,
+        "RATE": 28,
+        "COST": 4,
+        "LAB": 10,
+        "POLICY": 20,
+        "SPEC": 14
+      },
+      "packId": "BANK"
+    },
+    {
+      "profileId": "banks-regional",
+      "sector": "financial",
+      "name": "Banks - Regional",
+      "weights": {
+        "DEM": 22,
+        "RATE": 27,
+        "COST": 4,
+        "LAB": 10,
+        "POLICY": 20,
+        "SPEC": 17
+      },
+      "packId": "BANK"
+    },
+    {
+      "profileId": "capital-markets",
+      "sector": "financial",
+      "name": "Capital Markets",
+      "weights": {
+        "DEM": 28,
+        "RATE": 24,
+        "COST": 5,
+        "LAB": 12,
+        "POLICY": 15,
+        "SPEC": 16
+      },
+      "packId": "BANK"
+    },
+    {
+      "profileId": "credit-services",
+      "sector": "financial",
+      "name": "Credit Services",
+      "weights": {
+        "DEM": 32,
+        "RATE": 18,
+        "COST": 8,
+        "LAB": 10,
+        "POLICY": 18,
+        "SPEC": 14
+      },
+      "packId": "CREDIT"
+    },
+    {
+      "profileId": "financial-conglomerates",
+      "sector": "financial",
+      "name": "Financial Conglomerates",
+      "weights": {
+        "DEM": 25,
+        "RATE": 22,
+        "COST": 5,
+        "LAB": 10,
+        "POLICY": 23,
+        "SPEC": 15
+      },
+      "packId": "BANK"
+    },
+    {
+      "profileId": "financial-data-and-stock-exchanges",
+      "sector": "financial",
+      "name": "Financial Data & Stock Exchanges",
+      "weights": {
+        "DEM": 28,
+        "RATE": 20,
+        "COST": 5,
+        "LAB": 14,
+        "POLICY": 18,
+        "SPEC": 15
+      },
+      "packId": "BANK"
+    },
+    {
+      "profileId": "insurance-diversified",
+      "sector": "financial",
+      "name": "Insurance - Diversified",
+      "weights": {
+        "DEM": 22,
+        "RATE": 20,
+        "COST": 8,
+        "LAB": 12,
+        "POLICY": 22,
+        "SPEC": 16
+      },
+      "packId": "INSURE"
+    },
+    {
+      "profileId": "insurance-life",
+      "sector": "financial",
+      "name": "Insurance - Life",
+      "weights": {
+        "DEM": 20,
+        "RATE": 28,
+        "COST": 6,
+        "LAB": 10,
+        "POLICY": 20,
+        "SPEC": 16
+      },
+      "packId": "INSURE"
+    },
+    {
+      "profileId": "insurance-property-and-casualty",
+      "sector": "financial",
+      "name": "Insurance - Property & Casualty",
+      "weights": {
+        "DEM": 22,
+        "RATE": 18,
+        "COST": 15,
+        "LAB": 14,
+        "POLICY": 20,
+        "SPEC": 11
+      },
+      "packId": "INSURE"
+    },
+    {
+      "profileId": "insurance-reinsurance",
+      "sector": "financial",
+      "name": "Insurance - Reinsurance",
+      "weights": {
+        "DEM": 20,
+        "RATE": 18,
+        "COST": 18,
+        "LAB": 12,
+        "POLICY": 20,
+        "SPEC": 12
+      },
+      "packId": "INSURE"
+    },
+    {
+      "profileId": "insurance-specialty",
+      "sector": "financial",
+      "name": "Insurance - Specialty",
+      "weights": {
+        "DEM": 22,
+        "RATE": 18,
+        "COST": 12,
+        "LAB": 14,
+        "POLICY": 20,
+        "SPEC": 14
+      },
+      "packId": "INSURE"
+    },
+    {
+      "profileId": "insurance-brokers",
+      "sector": "financial",
+      "name": "Insurance Brokers",
+      "weights": {
+        "DEM": 28,
+        "RATE": 18,
+        "COST": 5,
+        "LAB": 18,
+        "POLICY": 18,
+        "SPEC": 13
+      },
+      "packId": "INSURE"
+    },
+    {
+      "profileId": "mortgage-finance",
+      "sector": "financial",
+      "name": "Mortgage Finance",
+      "weights": {
+        "DEM": 20,
+        "RATE": 32,
+        "COST": 5,
+        "LAB": 10,
+        "POLICY": 20,
+        "SPEC": 13
+      },
+      "packId": "REAL_ESTATE"
+    },
+    {
+      "profileId": "biotechnology",
+      "sector": "healthcare",
+      "name": "Biotechnology",
+      "weights": {
+        "DEM": 18,
+        "RATE": 20,
+        "COST": 5,
+        "LAB": 12,
+        "POLICY": 28,
+        "SPEC": 17
+      },
+      "packId": "BIOTECH"
+    },
+    {
+      "profileId": "diagnostics-and-research",
+      "sector": "healthcare",
+      "name": "Diagnostics & Research",
+      "weights": {
+        "DEM": 22,
+        "RATE": 15,
+        "COST": 8,
+        "LAB": 18,
+        "POLICY": 22,
+        "SPEC": 15
+      },
+      "packId": "HEALTH"
+    },
+    {
+      "profileId": "drug-manufacturers-general",
+      "sector": "healthcare",
+      "name": "Drug Manufacturers - General",
+      "weights": {
+        "DEM": 20,
+        "RATE": 16,
+        "COST": 8,
+        "LAB": 12,
+        "POLICY": 30,
+        "SPEC": 14
+      },
+      "packId": "PHARMA"
+    },
+    {
+      "profileId": "drug-manufacturers-specialty-and-generic",
+      "sector": "healthcare",
+      "name": "Drug Manufacturers - Specialty & Generic",
+      "weights": {
+        "DEM": 22,
+        "RATE": 15,
+        "COST": 10,
+        "LAB": 14,
+        "POLICY": 26,
+        "SPEC": 13
+      },
+      "packId": "PHARMA"
+    },
+    {
+      "profileId": "health-information-services",
+      "sector": "healthcare",
+      "name": "Health Information Services",
+      "weights": {
+        "DEM": 25,
+        "RATE": 18,
+        "COST": 5,
+        "LAB": 18,
+        "POLICY": 20,
+        "SPEC": 14
+      },
+      "packId": "HEALTH"
+    },
+    {
+      "profileId": "healthcare-plans",
+      "sector": "healthcare",
+      "name": "Healthcare Plans",
+      "weights": {
+        "DEM": 22,
+        "RATE": 15,
+        "COST": 5,
+        "LAB": 12,
+        "POLICY": 38,
+        "SPEC": 8
+      },
+      "packId": "HEALTH"
+    },
+    {
+      "profileId": "medical-care-facilities",
+      "sector": "healthcare",
+      "name": "Medical Care Facilities",
+      "weights": {
+        "DEM": 24,
+        "RATE": 15,
+        "COST": 8,
+        "LAB": 22,
+        "POLICY": 22,
+        "SPEC": 9
+      },
+      "packId": "MED_SERVICES"
+    },
+    {
+      "profileId": "medical-devices",
+      "sector": "healthcare",
+      "name": "Medical Devices",
+      "weights": {
+        "DEM": 26,
+        "RATE": 18,
+        "COST": 12,
+        "LAB": 14,
+        "POLICY": 20,
+        "SPEC": 10
+      },
+      "packId": "MED_DEVICE"
+    },
+    {
+      "profileId": "medical-distribution",
+      "sector": "healthcare",
+      "name": "Medical Distribution",
+      "weights": {
+        "DEM": 26,
+        "RATE": 14,
+        "COST": 18,
+        "LAB": 15,
+        "POLICY": 16,
+        "SPEC": 11
+      },
+      "packId": "MED_DEVICE"
+    },
+    {
+      "profileId": "medical-instruments-and-supplies",
+      "sector": "healthcare",
+      "name": "Medical Instruments & Supplies",
+      "weights": {
+        "DEM": 25,
+        "RATE": 16,
+        "COST": 16,
+        "LAB": 15,
+        "POLICY": 17,
+        "SPEC": 11
+      },
+      "packId": "MED_DEVICE"
+    },
+    {
+      "profileId": "aerospace-and-defense",
+      "sector": "industrials",
+      "name": "Aerospace & Defense",
+      "weights": {
+        "DEM": 22,
+        "RATE": 14,
+        "COST": 12,
+        "LAB": 12,
+        "POLICY": 28,
+        "SPEC": 12
+      },
+      "packId": "DEFENSE"
+    },
+    {
+      "profileId": "airlines",
+      "sector": "industrials",
+      "name": "Airlines",
+      "weights": {
+        "DEM": 32,
+        "RATE": 18,
+        "COST": 25,
+        "LAB": 14,
+        "POLICY": 6,
+        "SPEC": 5
+      },
+      "packId": "TRAVEL"
+    },
+    {
+      "profileId": "airports-and-air-services",
+      "sector": "industrials",
+      "name": "Airports & Air Services",
+      "weights": {
+        "DEM": 30,
+        "RATE": 18,
+        "COST": 16,
+        "LAB": 16,
+        "POLICY": 12,
+        "SPEC": 8
+      },
+      "packId": "TRAVEL"
+    },
+    {
+      "profileId": "building-products-and-equipment",
+      "sector": "industrials",
+      "name": "Building Products & Equipment",
+      "weights": {
+        "DEM": 28,
+        "RATE": 20,
+        "COST": 18,
+        "LAB": 12,
+        "POLICY": 10,
+        "SPEC": 12
+      },
+      "packId": "MATERIALS"
+    },
+    {
+      "profileId": "business-equipment-and-supplies",
+      "sector": "industrials",
+      "name": "Business Equipment & Supplies",
+      "weights": {
+        "DEM": 28,
+        "RATE": 15,
+        "COST": 16,
+        "LAB": 15,
+        "POLICY": 10,
+        "SPEC": 16
+      },
+      "packId": "INDUSTRY"
+    },
+    {
+      "profileId": "conglomerates",
+      "sector": "industrials",
+      "name": "Conglomerates",
+      "weights": {
+        "DEM": 25,
+        "RATE": 18,
+        "COST": 12,
+        "LAB": 14,
+        "POLICY": 14,
+        "SPEC": 17
+      },
+      "packId": "INDUSTRY"
+    },
+    {
+      "profileId": "consulting-services",
+      "sector": "industrials",
+      "name": "Consulting Services",
+      "weights": {
+        "DEM": 28,
+        "RATE": 16,
+        "COST": 5,
+        "LAB": 22,
+        "POLICY": 12,
+        "SPEC": 17
+      },
+      "packId": "GOV_SERVICES"
+    },
+    {
+      "profileId": "electrical-equipment-and-parts",
+      "sector": "industrials",
+      "name": "Electrical Equipment & Parts",
+      "weights": {
+        "DEM": 28,
+        "RATE": 18,
+        "COST": 18,
+        "LAB": 12,
+        "POLICY": 14,
+        "SPEC": 10
+      },
+      "packId": "INDUSTRY"
+    },
+    {
+      "profileId": "engineering-and-construction",
+      "sector": "industrials",
+      "name": "Engineering & Construction",
+      "weights": {
+        "DEM": 30,
+        "RATE": 18,
+        "COST": 16,
+        "LAB": 15,
+        "POLICY": 12,
+        "SPEC": 9
+      },
+      "packId": "MATERIALS"
+    },
+    {
+      "profileId": "farm-and-heavy-construction-machinery",
+      "sector": "industrials",
+      "name": "Farm & Heavy Construction Machinery",
+      "weights": {
+        "DEM": 24,
+        "RATE": 16,
+        "COST": 24,
+        "LAB": 12,
+        "POLICY": 12,
+        "SPEC": 12
+      },
+      "packId": "AGRI"
+    },
+    {
+      "profileId": "industrial-distribution",
+      "sector": "industrials",
+      "name": "Industrial Distribution",
+      "weights": {
+        "DEM": 28,
+        "RATE": 16,
+        "COST": 18,
+        "LAB": 14,
+        "POLICY": 10,
+        "SPEC": 14
+      },
+      "packId": "INDUSTRY"
+    },
+    {
+      "profileId": "integrated-freight-and-logistics",
+      "sector": "industrials",
+      "name": "Integrated Freight & Logistics",
+      "weights": {
+        "DEM": 28,
+        "RATE": 16,
+        "COST": 22,
+        "LAB": 16,
+        "POLICY": 8,
+        "SPEC": 10
+      },
+      "packId": "FREIGHT"
+    },
+    {
+      "profileId": "marine-shipping",
+      "sector": "industrials",
+      "name": "Marine Shipping",
+      "weights": {
+        "DEM": 27,
+        "RATE": 16,
+        "COST": 22,
+        "LAB": 12,
+        "POLICY": 12,
+        "SPEC": 11
+      },
+      "packId": "FREIGHT"
+    },
+    {
+      "profileId": "pollution-and-treatment-controls",
+      "sector": "industrials",
+      "name": "Pollution & Treatment Controls",
+      "weights": {
+        "DEM": 24,
+        "RATE": 14,
+        "COST": 12,
+        "LAB": 12,
+        "POLICY": 30,
+        "SPEC": 8
+      },
+      "packId": "ENVIRONMENT"
+    },
+    {
+      "profileId": "railroads",
+      "sector": "industrials",
+      "name": "Railroads",
+      "weights": {
+        "DEM": 26,
+        "RATE": 20,
+        "COST": 18,
+        "LAB": 16,
+        "POLICY": 10,
+        "SPEC": 10
+      },
+      "packId": "FREIGHT"
+    },
+    {
+      "profileId": "rental-and-leasing-services",
+      "sector": "industrials",
+      "name": "Rental & Leasing Services",
+      "weights": {
+        "DEM": 28,
+        "RATE": 22,
+        "COST": 12,
+        "LAB": 16,
+        "POLICY": 10,
+        "SPEC": 12
+      },
+      "packId": "INDUSTRY"
+    },
+    {
+      "profileId": "specialty-business-services",
+      "sector": "industrials",
+      "name": "Specialty Business Services",
+      "weights": {
+        "DEM": 28,
+        "RATE": 16,
+        "COST": 6,
+        "LAB": 22,
+        "POLICY": 12,
+        "SPEC": 16
+      },
+      "packId": "GOV_SERVICES"
+    },
+    {
+      "profileId": "specialty-industrial-machinery",
+      "sector": "industrials",
+      "name": "Specialty Industrial Machinery",
+      "weights": {
+        "DEM": 26,
+        "RATE": 20,
+        "COST": 18,
+        "LAB": 12,
+        "POLICY": 12,
+        "SPEC": 12
+      },
+      "packId": "INDUSTRY"
+    },
+    {
+      "profileId": "staffing-and-employment-services",
+      "sector": "industrials",
+      "name": "Staffing & Employment Services",
+      "weights": {
+        "DEM": 28,
+        "RATE": 15,
+        "COST": 5,
+        "LAB": 28,
+        "POLICY": 12,
+        "SPEC": 12
+      },
+      "packId": "GOV_SERVICES"
+    },
+    {
+      "profileId": "tools-and-accessories",
+      "sector": "industrials",
+      "name": "Tools & Accessories",
+      "weights": {
+        "DEM": 28,
+        "RATE": 15,
+        "COST": 18,
+        "LAB": 14,
+        "POLICY": 10,
+        "SPEC": 15
+      },
+      "packId": "INDUSTRY"
+    },
+    {
+      "profileId": "trucking",
+      "sector": "industrials",
+      "name": "Trucking",
+      "weights": {
+        "DEM": 28,
+        "RATE": 16,
+        "COST": 24,
+        "LAB": 18,
+        "POLICY": 8,
+        "SPEC": 6
+      },
+      "packId": "FREIGHT"
+    },
+    {
+      "profileId": "waste-management",
+      "sector": "industrials",
+      "name": "Waste Management",
+      "weights": {
+        "DEM": 24,
+        "RATE": 22,
+        "COST": 14,
+        "LAB": 18,
+        "POLICY": 14,
+        "SPEC": 8
+      },
+      "packId": "ENVIRONMENT"
+    },
+    {
+      "profileId": "real-estate-development",
+      "sector": "real-estate",
+      "name": "Real Estate - Development",
+      "weights": {
+        "DEM": 25,
+        "RATE": 25,
+        "COST": 14,
+        "LAB": 10,
+        "POLICY": 12,
+        "SPEC": 14
+      },
+      "packId": "REAL_ESTATE"
+    },
+    {
+      "profileId": "real-estate-diversified",
+      "sector": "real-estate",
+      "name": "Real Estate - Diversified",
+      "weights": {
+        "DEM": 24,
+        "RATE": 26,
+        "COST": 12,
+        "LAB": 10,
+        "POLICY": 14,
+        "SPEC": 14
+      },
+      "packId": "REAL_ESTATE"
+    },
+    {
+      "profileId": "real-estate-services",
+      "sector": "real-estate",
+      "name": "Real Estate Services",
+      "weights": {
+        "DEM": 30,
+        "RATE": 20,
+        "COST": 8,
+        "LAB": 15,
+        "POLICY": 10,
+        "SPEC": 17
+      },
+      "packId": "REAL_ESTATE"
+    },
+    {
+      "profileId": "reit-diversified",
+      "sector": "real-estate",
+      "name": "REIT - Diversified",
+      "weights": {
+        "DEM": 22,
+        "RATE": 30,
+        "COST": 10,
+        "LAB": 10,
+        "POLICY": 14,
+        "SPEC": 14
+      },
+      "packId": "REIT"
+    },
+    {
+      "profileId": "reit-healthcare-facilities",
+      "sector": "real-estate",
+      "name": "REIT - Healthcare Facilities",
+      "weights": {
+        "DEM": 22,
+        "RATE": 27,
+        "COST": 8,
+        "LAB": 15,
+        "POLICY": 18,
+        "SPEC": 10
+      },
+      "packId": "REIT"
+    },
+    {
+      "profileId": "reit-hotel-and-motel",
+      "sector": "real-estate",
+      "name": "REIT - Hotel & Motel",
+      "weights": {
+        "DEM": 30,
+        "RATE": 27,
+        "COST": 12,
+        "LAB": 14,
+        "POLICY": 8,
+        "SPEC": 9
+      },
+      "packId": "LODGING"
+    },
+    {
+      "profileId": "reit-industrial",
+      "sector": "real-estate",
+      "name": "REIT - Industrial",
+      "weights": {
+        "DEM": 26,
+        "RATE": 30,
+        "COST": 10,
+        "LAB": 10,
+        "POLICY": 12,
+        "SPEC": 12
+      },
+      "packId": "REIT"
+    },
+    {
+      "profileId": "reit-mortgage",
+      "sector": "real-estate",
+      "name": "REIT - Mortgage",
+      "weights": {
+        "DEM": 18,
+        "RATE": 36,
+        "COST": 6,
+        "LAB": 8,
+        "POLICY": 18,
+        "SPEC": 14
+      },
+      "packId": "REAL_ESTATE"
+    },
+    {
+      "profileId": "reit-office",
+      "sector": "real-estate",
+      "name": "REIT - Office",
+      "weights": {
+        "DEM": 22,
+        "RATE": 32,
+        "COST": 10,
+        "LAB": 12,
+        "POLICY": 12,
+        "SPEC": 12
+      },
+      "packId": "REIT"
+    },
+    {
+      "profileId": "reit-residential",
+      "sector": "real-estate",
+      "name": "REIT - Residential",
+      "weights": {
+        "DEM": 25,
+        "RATE": 30,
+        "COST": 12,
+        "LAB": 12,
+        "POLICY": 10,
+        "SPEC": 11
+      },
+      "packId": "REIT"
+    },
+    {
+      "profileId": "reit-retail",
+      "sector": "real-estate",
+      "name": "REIT - Retail",
+      "weights": {
+        "DEM": 27,
+        "RATE": 28,
+        "COST": 12,
+        "LAB": 12,
+        "POLICY": 10,
+        "SPEC": 11
+      },
+      "packId": "REIT"
+    },
+    {
+      "profileId": "reit-specialty",
+      "sector": "real-estate",
+      "name": "REIT - Specialty",
+      "weights": {
+        "DEM": 24,
+        "RATE": 29,
+        "COST": 10,
+        "LAB": 12,
+        "POLICY": 13,
+        "SPEC": 12
+      },
+      "packId": "REIT"
+    },
+    {
+      "profileId": "communication-equipment",
+      "sector": "technology",
+      "name": "Communication Equipment",
+      "weights": {
+        "DEM": 26,
+        "RATE": 20,
+        "COST": 16,
+        "LAB": 14,
+        "POLICY": 16,
+        "SPEC": 8
+      },
+      "packId": "TECH"
+    },
+    {
+      "profileId": "computer-hardware",
+      "sector": "technology",
+      "name": "Computer Hardware",
+      "weights": {
+        "DEM": 30,
+        "RATE": 20,
+        "COST": 18,
+        "LAB": 12,
+        "POLICY": 12,
+        "SPEC": 8
+      },
+      "packId": "TECH"
+    },
+    {
+      "profileId": "consumer-electronics",
+      "sector": "technology",
+      "name": "Consumer Electronics",
+      "weights": {
+        "DEM": 32,
+        "RATE": 17,
+        "COST": 18,
+        "LAB": 12,
+        "POLICY": 12,
+        "SPEC": 9
+      },
+      "packId": "TECH"
+    },
+    {
+      "profileId": "electronic-components",
+      "sector": "technology",
+      "name": "Electronic Components",
+      "weights": {
+        "DEM": 28,
+        "RATE": 18,
+        "COST": 22,
+        "LAB": 12,
+        "POLICY": 12,
+        "SPEC": 8
+      },
+      "packId": "TECH"
+    },
+    {
+      "profileId": "electronic-gaming-and-multimedia",
+      "sector": "technology",
+      "name": "Electronic Gaming & Multimedia",
+      "weights": {
+        "DEM": 32,
+        "RATE": 18,
+        "COST": 8,
+        "LAB": 16,
+        "POLICY": 12,
+        "SPEC": 14
+      },
+      "packId": "MEDIA"
+    },
+    {
+      "profileId": "electronics-and-computer-distribution",
+      "sector": "technology",
+      "name": "Electronics & Computer Distribution",
+      "weights": {
+        "DEM": 28,
+        "RATE": 16,
+        "COST": 20,
+        "LAB": 12,
+        "POLICY": 12,
+        "SPEC": 12
+      },
+      "packId": "TECH"
+    },
+    {
+      "profileId": "information-technology-services",
+      "sector": "technology",
+      "name": "Information Technology Services",
+      "weights": {
+        "DEM": 28,
+        "RATE": 18,
+        "COST": 5,
+        "LAB": 22,
+        "POLICY": 12,
+        "SPEC": 15
+      },
+      "packId": "SOFTWARE"
+    },
+    {
+      "profileId": "scientific-and-technical-instruments",
+      "sector": "technology",
+      "name": "Scientific & Technical Instruments",
+      "weights": {
+        "DEM": 25,
+        "RATE": 18,
+        "COST": 14,
+        "LAB": 15,
+        "POLICY": 14,
+        "SPEC": 14
+      },
+      "packId": "TECH"
+    },
+    {
+      "profileId": "semiconductor-equipment-and-materials",
+      "sector": "technology",
+      "name": "Semiconductor Equipment & Materials",
+      "weights": {
+        "DEM": 28,
+        "RATE": 18,
+        "COST": 22,
+        "LAB": 10,
+        "POLICY": 14,
+        "SPEC": 8
+      },
+      "packId": "TECH"
+    },
+    {
+      "profileId": "semiconductors",
+      "sector": "technology",
+      "name": "Semiconductors",
+      "weights": {
+        "DEM": 30,
+        "RATE": 18,
+        "COST": 20,
+        "LAB": 10,
+        "POLICY": 14,
+        "SPEC": 8
+      },
+      "packId": "TECH"
+    },
+    {
+      "profileId": "software-application",
+      "sector": "technology",
+      "name": "Software - Application",
+      "weights": {
+        "DEM": 28,
+        "RATE": 23,
+        "COST": 5,
+        "LAB": 18,
+        "POLICY": 12,
+        "SPEC": 14
+      },
+      "packId": "SOFTWARE"
+    },
+    {
+      "profileId": "software-infrastructure",
+      "sector": "technology",
+      "name": "Software - Infrastructure",
+      "weights": {
+        "DEM": 30,
+        "RATE": 22,
+        "COST": 8,
+        "LAB": 14,
+        "POLICY": 14,
+        "SPEC": 12
+      },
+      "packId": "SOFTWARE"
+    },
+    {
+      "profileId": "solar",
+      "sector": "technology",
+      "name": "Solar",
+      "weights": {
+        "DEM": 25,
+        "RATE": 24,
+        "COST": 18,
+        "LAB": 10,
+        "POLICY": 17,
+        "SPEC": 6
+      },
+      "packId": "UTIL"
+    },
+    {
+      "profileId": "utilities-diversified",
+      "sector": "utilities",
+      "name": "Utilities - Diversified",
+      "weights": {
+        "DEM": 18,
+        "RATE": 27,
+        "COST": 14,
+        "LAB": 12,
+        "POLICY": 18,
+        "SPEC": 11
+      },
+      "packId": "UTIL"
+    },
+    {
+      "profileId": "utilities-independent-power-producers",
+      "sector": "utilities",
+      "name": "Utilities - Independent Power Producers",
+      "weights": {
+        "DEM": 22,
+        "RATE": 22,
+        "COST": 22,
+        "LAB": 10,
+        "POLICY": 16,
+        "SPEC": 8
+      },
+      "packId": "UTIL"
+    },
+    {
+      "profileId": "utilities-regulated-electric",
+      "sector": "utilities",
+      "name": "Utilities - Regulated Electric",
+      "weights": {
+        "DEM": 18,
+        "RATE": 30,
+        "COST": 14,
+        "LAB": 10,
+        "POLICY": 20,
+        "SPEC": 8
+      },
+      "packId": "UTIL"
+    },
+    {
+      "profileId": "utilities-regulated-gas",
+      "sector": "utilities",
+      "name": "Utilities - Regulated Gas",
+      "weights": {
+        "DEM": 18,
+        "RATE": 28,
+        "COST": 20,
+        "LAB": 10,
+        "POLICY": 18,
+        "SPEC": 6
+      },
+      "packId": "UTIL"
+    },
+    {
+      "profileId": "utilities-regulated-water",
+      "sector": "utilities",
+      "name": "Utilities - Regulated Water",
+      "weights": {
+        "DEM": 18,
+        "RATE": 29,
+        "COST": 10,
+        "LAB": 12,
+        "POLICY": 21,
+        "SPEC": 10
+      },
+      "packId": "UTIL"
+    },
+    {
+      "profileId": "utilities-renewable",
+      "sector": "utilities",
+      "name": "Utilities - Renewable",
+      "weights": {
+        "DEM": 24,
+        "RATE": 24,
+        "COST": 16,
+        "LAB": 10,
+        "POLICY": 18,
+        "SPEC": 8
+      },
+      "packId": "UTIL"
+    }
+  ]
+}

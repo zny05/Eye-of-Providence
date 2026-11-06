@@ -6,6 +6,7 @@ import { cache } from 'react';
 import { QUOTE_TTL_SECONDS } from '@/lib/market-data';
 import { hasFinnhubQuotes } from '@/lib/markets';
 import { getSession } from '@/lib/better-auth/auth';
+import { FACTOR_METRIC_KEYS, type FactorMetricKey } from '@/lib/eye/types';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 // Key pool: each free key has its own 60 req/min, so N keys = N x the quota. Rotated per request.
@@ -40,9 +41,7 @@ type FinnhubQuote = {
 };
 
 type FinnhubStockMetrics = {
-    metric?: {
-        dividendYieldIndicatedAnnual?: number | null;
-    };
+    metric?: Record<string, number | string | null | undefined>;
 };
 
 type FinnhubCompanyProfile = {
@@ -217,6 +216,27 @@ export async function getStockMetrics(symbol: string): Promise<number | null> {
             : null;
     } catch (error) {
         logFailure('stock metrics', symbol, error);
+        return null;
+    }
+}
+
+// Same URL and TTL as getStockMetrics, so both share one cached response and one Finnhub request.
+export async function getStockFactorMetrics(symbol: string): Promise<Partial<Record<FactorMetricKey, number | null>> | null> {
+    if (FINNHUB_KEYS.length === 0 || !hasFinnhubQuotes(symbol)) return null;
+
+    try {
+        const url = `${FINNHUB_BASE_URL}/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all`;
+        const data = await fetchJSON<FinnhubStockMetrics>(url, 3600);
+        const metric = data?.metric;
+        if (!metric) return null;
+        const out: Partial<Record<FactorMetricKey, number | null>> = {};
+        for (const key of FACTOR_METRIC_KEYS) {
+            const v = metric[key];
+            out[key] = typeof v === 'number' && Number.isFinite(v) ? v : null;
+        }
+        return out;
+    } catch (error) {
+        logFailure('factor metrics', symbol, error);
         return null;
     }
 }
