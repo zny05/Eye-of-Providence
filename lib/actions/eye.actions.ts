@@ -31,6 +31,11 @@ async function pickBackground(selected: string[], watchlist: string[]): Promise<
 }
 
 export async function getEyeExplain(requested: string[]): Promise<EyeExplain> {
+    // DB-first: getStockFactorMetrics / getCompanyProfile / getStockRecommendation read from the
+    // FinnhubMetricSnapshot Mongo cache (TTL 12h) in steady state; live Finnhub is the miss/backfill
+    // path and is also pre-warmed by the Inngest job every 6 hours. API key spend stays under the
+    // free plan's 60/min and the page no longer waits on ~50 live Finnhub calls per load.
+    // DB-first：稳态只读 Mongo，miss 才打 Finnhub，Inngest 每 6 小时预热。
     await requireUserId();
     const selected = parseSymbols(requested);
     const items: { symbol: string; company?: string }[] = await getUserWatchlist();

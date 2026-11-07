@@ -43,7 +43,7 @@ describe('buildExplainView', () => {
     const asOf = new Date('2025-03-25T12:00:00Z'); // Mercury is retrograde
     const stocks = [
         stock('PEER1', { changePct: -1 }, { peTTM: 40, revenueGrowthTTMYoy: 25, roeTTM: 10, '13WeekPriceReturnDaily': 10 }),
-        stock('AAA', { changePct: 2, recommendation: 4.2 }, { peTTM: 10, revenueGrowthTTMYoy: 5, roeTTM: 30, '13WeekPriceReturnDaily': -5, '1MonthPriceReturnDaily': 3 }),
+        stock('AAA', { changePct: 2, recommendation: 4.2 }, { peTTM: 10, revenueGrowthTTMYoy: 5, roeTTM: 30, '13WeekPriceReturnDaily': -5, 'monthToDatePriceReturnDaily': 3 }),
         stock('PEER2', { changePct: 0.5 }, { peTTM: 20, revenueGrowthTTMYoy: 15, roeTTM: 20, '13WeekPriceReturnDaily': 0 }),
         stock('BBB', { changePct: -3, industry: 'Banking' }, { peTTM: 5, revenueGrowthTTMYoy: 9, roeTTM: 15, '13WeekPriceReturnDaily': 7 }),
         stock('EMPTY', { changePct: null, marketCap: null, price: null }),
@@ -98,5 +98,21 @@ describe('buildExplainView', () => {
         expect(table.columns.a_ruler_retro).toEqual(['Direct', 'Direct', 'Direct', 'Direct']); // Uranus/Jupiter direct in March 2025
         expect(view.astro.moon.illumination).toBeGreaterThanOrEqual(0);
         expect(view.astro.retrograde).toContain('Mercury');
+    });
+
+    it('labels axes with a reason: ok when a value exists, no-data when every field is null', () => {
+        // v_ey has readings; g_gm is null for every fixture (no grossMarginTTM key), so no-data.
+        expect(axes.find((a) => a.id === 'v_ey')!.reason).toBe('ok');
+        expect(axes.find((a) => a.id === 'q_gm')!.reason).toBe('no-data');
+        expect(axes.find((a) => a.id === 'r_today')!.reason).toBe('ok');
+        // the month-to-date axis now reads monthToDatePriceReturnDaily, which only AAA has
+        expect(axes.find((a) => a.id === 'r_1m')!.reason).toBe('ok');
+        expect(axes.find((a) => a.id === 'r_1q')!.reason).toBe('ok');
+    });
+
+    it('uses monthToDatePriceReturnDaily for r_1m (1MonthPriceReturnDaily is not on Finnhub free)', () => {
+        expect(table.columns.r_1m).toEqual([3, null, null, null]);
+        expect(axes.find((a) => a.id === 'r_1m')!.labelEn).toBe('Month-to-date return');
+        expect(axes.find((a) => a.id === 'r_1m')!.labelZh).toContain('MTD');
     });
 });

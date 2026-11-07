@@ -6,6 +6,7 @@ import { getNews } from "@/lib/actions/finnhub.actions";
 import { collectAdanosSentimentForSymbol } from "@/lib/actions/adanos-collect.actions";
 import { getFormattedTodayDate } from "@/lib/utils";
 import { callAIProviderWithFallback } from "@/lib/ai-provider";
+import { warmFinnhubMetricCache } from "@/lib/actions/finnhub.actions";
 
 export const sendSignUpEmail = inngest.createFunction(
     { id: 'sign-up-email', triggers: [{ event: 'app/user.created' }] },
@@ -556,5 +557,37 @@ export const collectAdanosSentimentJob = inngest.createFunction(
             collectedSymbols: symbolsToCollect.length,
             skippedFreshCount: skippedFresh.length,
         };
+    }
+);
+
+/**
+ * Pre-warm the FinnhubMetricSnapshot Mongo cache every 6 hours.
+ * English: reads every unique symbol on any user's watchlist and refreshes the
+ * 12h-TTL Finnhub metric snapshots, so /eye reads from Mongo in steady state
+ * instead of fanning out ~50 live Finnhub calls per page load (60/min free limit).
+ * 中文：每 6 小时把用户 watchlist 全部标的的 Finnhub metric 快照（Mongo，TTL 12h）预热刷新，
+ * 避免用户打开 /eye 时单页内发出几十个实时请求撞到免费版 60/min 限制。
+ */
+export const warmFinnhubMetricCacheJob = inngest.createFunction(
+    { id: 'warm-finnhub-metric-cache', concurrency: 1, triggers: [{ cron: '0 */6 * * *' }] }, // every 6 hours on the hour
+    async ({ step }) => {
+        const { connectToDatabase } = await import("@/database/mongoose");
+        const mongoose = await connectToDatabase();
+        const db = mongoose.connection.db;
+        if (!db) throw new Error("No DB Connection");
+        const allSymbols = (await db.collection('watchlists').distinct('symbol')).filter(
+            (s: unknown): s is string => typeof s === 'string',
+        );
+        if (allSymbols.length === 0) return { symbols: 0, ok: 0, failed: 0 };
+
+        let ok = 0;
+        let failed = 0;
+        for (const symbol of allSymbols) {
+            const result = await step.run(`warm-${symbol}`, async () => warmFinnhubMetricCache([symbol]));
+            ok += result.ok;
+            failed += result.failed;
+            await step.sleep('pace', '1 second');
+        }
+        return { symbols: allSymbols.length, ok, failed };
     }
 );

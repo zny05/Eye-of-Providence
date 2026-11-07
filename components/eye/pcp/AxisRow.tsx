@@ -96,12 +96,27 @@ function AxisRow({ axis, index, axisCount, y, g, column, reversed, bands, select
         return [...groups];
     }, [catalog, usedIds, axis.id]);
 
+    // Reason chips: make empty axes self-explaining instead of an ambiguous gap.
+    // fetch-failed = the live request failed (429/403/timeout); no-data = request OK but every
+    // reading was null (wrong field name, or a symbol with no fundamentals for this axis).
+    const reasonChip =
+        axis.reason === 'fetch-failed' ? (
+            <span className="flex-none rounded bg-down/15 px-1 text-[10px] text-down" title="Request failed (rate limit, forbidden, or timeout). Check the server logs for 'Error fetching' lines. / 请求失败（限流/403/超时）">
+                fetch-failed
+            </span>
+        ) : axis.reason === 'no-data' ? (
+            <span className="flex-none rounded bg-white/10 px-1 text-[10px] text-muted-foreground" title="Finnhub returned data but this field was null for every symbol (wrong field name, or a symbol with no fundamentals). / 有数据，但该字段全为 null">
+                no-data
+            </span>
+        ) : null;
+
     const badges = (
         <>
             {astro && <span className="flex-none rounded px-1 text-[10px] font-semibold" style={{ background: 'rgba(139,92,246,0.22)', color: ASTRO_COLOR }} title={axis.approx}>symbolic</span>}
             {axis.approx && !astro && <span className="flex-none rounded bg-white/10 px-1 text-[10px] text-muted-foreground" title={axis.approx}>≈</span>}
             {!axis.verified && !astro && <span className="flex-none rounded bg-white/10 px-1 text-[10px] text-faint" title="Source field or unit not yet verified">unverified</span>}
             {lowCoverage && <AlertTriangle className="size-3.5 flex-none text-warn" aria-label={`Only ${Math.round(axis.coverage * 100)}% coverage`} />}
+            {reasonChip}
         </>
     );
     const controls = (

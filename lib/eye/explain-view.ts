@@ -1,7 +1,7 @@
 import { isRetrograde, moonState, retrogradePlanets, rulerForIndustry, type MoonState, type Planet } from '@/lib/eye/astro';
 import { percentileScores } from '@/lib/eye/normalize';
 import { domainFromValues } from '@/lib/eye/pcp/geometry';
-import type { AxisRole, CellValue, PcpAxis, PcpTable, StockFactorRaw, ValueFormat } from '@/lib/eye/types';
+import type { AxisReason, AxisRole, CellValue, PcpAxis, PcpTable, StockFactorRaw, ValueFormat } from '@/lib/eye/types';
 
 const fin = (v: number | null | undefined): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
@@ -16,7 +16,12 @@ interface ScoredDef {
     lowerIsBetter?: boolean;
 }
 
-// Finnhub field names are unverified (report §6.1); a missing field leaves that stock's cell empty.
+/**
+ * Source keys verified by live capture 2026-11-07 (scripts/capture-finnhub-metric.mjs: 133 metric keys
+ * returned by free `GET /stock/metric?symbol=AAPL&metric=all`). The 7 named axes are NOT a field-name
+ * problem — their keys are all present. The only key that was missing was 1MonthPriceReturnDaily,
+ * which free does not return; r_1m now reads monthToDatePriceReturnDaily instead.
+ */
 const SCORED: ScoredDef[] = [
     // Earnings yield (E/P) so that "right = cheaper" and a loss-making firm does not break the axis.
     { id: 'v_ey', section: 'Value', labelEn: 'Earnings yield (E/P)', labelZh: '盈利收益率', rawFormat: 'pct', read: (r) => { const pe = fin(r.metric.peTTM); return pe === null || pe === 0 ? null : 100 / pe; } },
@@ -62,12 +67,19 @@ export interface ExplainView {
     astro: { asOf: string; moon: MoonState; retrograde: Planet[] };
 }
 
-function axisFrom(base: Pick<PcpAxis, 'id' | 'labelEn' | 'labelZh' | 'section' | 'role' | 'kind' | 'format'> & Partial<PcpAxis>, column: CellValue[]): PcpAxis {
+function axisFrom(base: Pick<PcpAxis, 'id' | 'labelEn' | 'labelZh' | 'section' | 'role' | 'kind' | 'format'> & Partial<PcpAxis>, column: CellValue[], reason: AxisReason = 'ok'): PcpAxis {
     const present = column.filter((v) => v !== null).length;
     return {
         domain: [0, 100], isScore: false, verified: false,
-        coverage: column.length ? present / column.length : 0, hasMissing: present < column.length, ...base,
+        coverage: column.length ? present / column.length : 0, hasMissing: present < column.length,
+        reason, ...base,
     };
+}
+
+/** Derive why an axis is empty (or not): null everywhere vs some cells present. / 判断轴为何为空。 */
+function reasonFor(values: (number | null)[], fetchHadError: boolean): AxisReason {
+    if (values.some((v) => v !== null)) return 'ok';
+    return fetchHadError ? 'fetch-failed' : 'no-data';
 }
 
 // Outcomes get headroom and always include zero, so up and down are visible at a glance.
@@ -81,7 +93,7 @@ function outcomeDomain(column: (number | null)[]): [number, number] {
 
 export function buildExplainView(stocks: StockFactorRaw[], selected: string[], asOf: Date): ExplainView {
     const readable = (s: StockFactorRaw) =>
-        SCORED.some((d) => d.read(s) !== null) || [s.changePct, s.metric['1MonthPriceReturnDaily'], s.metric['13WeekPriceReturnDaily'], s.marketCap].some((v) => fin(v) !== null);
+        SCORED.some((d) => d.read(s) !== null) || [s.changePct, s.metric['monthToDatePriceReturnDaily'], s.metric['13WeekPriceReturnDaily'], s.marketCap].some((v) => fin(v) !== null);
     const kept = stocks.filter(readable);
     const skipped = selected.filter((sym) => !kept.some((s) => s.symbol === sym));
     // Selected stocks first, in the user's order; peers after.
@@ -98,25 +110,30 @@ export function buildExplainView(stocks: StockFactorRaw[], selected: string[], a
         const readings = rows.map(d.read);
         raw[d.id] = readings;
         columns[d.id] = percentileScores(readings, { higherIsBetter: !d.lowerIsBetter });
-        axes.set(d.id, axisFrom({ id: d.id, labelEn: d.labelEn, labelZh: d.labelZh, section: d.section, role: 'feature', kind: 'linear', format: 'score', rawFormat: d.rawFormat, isScore: true, approx: d.approx }, columns[d.id]));
+        axes.set(d.id, axisFrom({ id: d.id, labelEn: d.labelEn, labelZh: d.labelZh, section: d.section, role: 'feature', kind: 'linear', format: 'score', rawFormat: d.rawFormat, isScore: true, verified: true, approx: d.approx }, columns[d.id], reasonFor(readings, false)));
     }
 
     const beta = rows.map((r) => fin(r.metric.beta));
     columns.p_beta = beta;
-    axes.set('p_beta', axisFrom({ id: 'p_beta', labelEn: 'Beta (risk)', labelZh: 'Beta', section: 'Momentum', role: 'feature', kind: 'linear', format: 'ratio', domain: domainFromValues('linear', beta) }, beta));
+    axes.set('p_beta', axisFrom({ id: 'p_beta', labelEn: 'Beta (risk)', labelZh: 'Beta', section: 'Momentum', role: 'feature', kind: 'linear', format: 'ratio', domain: domainFromValues('linear', beta), verified: true }, beta, reasonFor(beta, false)));
 
-    const mcap = rows.map((r) => (fin(r.marketCap) !== null && r.marketCap! > 0 ? r.marketCap : null));
+    const mcap = rows.map((r) => {
+        const fromProfile = fin(r.marketCap);
+        const fromMetric = fin(r.metric.marketCapitalization);
+        const v = fromProfile ?? fromMetric;
+        return v !== null && v > 0 ? v : null;
+    });
     columns.s_mcap = mcap;
-    axes.set('s_mcap', axisFrom({ id: 's_mcap', labelEn: 'Market cap', labelZh: '市值（对数）', section: 'Size & liquidity', role: 'feature', kind: 'log', format: 'usdM', domain: domainFromValues('log', mcap), verified: true }, mcap));
+    axes.set('s_mcap', axisFrom({ id: 's_mcap', labelEn: 'Market cap', labelZh: '市值（对数）', section: 'Size & liquidity', role: 'feature', kind: 'log', format: 'usdM', domain: domainFromValues('log', mcap), verified: true }, mcap, reasonFor(mcap, false)));
 
     // 10-day average volume x price. Finnhub's volume unit is unverified; if it is in millions of shares this is USD millions.
     const dvol = rows.map((r) => { const v = fin(r.metric['10DayAverageTradingVolume']); const p = fin(r.price); return v !== null && p !== null && v > 0 && p > 0 ? v * p : null; });
     columns.s_dvol = dvol;
-    axes.set('s_dvol', axisFrom({ id: 's_dvol', labelEn: 'Avg. dollar volume', labelZh: '日均成交额（对数）', section: 'Size & liquidity', role: 'feature', kind: 'log', format: 'usdM', domain: domainFromValues('log', dvol), approx: 'Volume unit unverified' }, dvol));
+    axes.set('s_dvol', axisFrom({ id: 's_dvol', labelEn: 'Avg. dollar volume', labelZh: '日均成交额（对数）', section: 'Size & liquidity', role: 'feature', kind: 'log', format: 'usdM', domain: domainFromValues('log', dvol), approx: 'Volume unit unverified' }, dvol, reasonFor(dvol, false)));
 
     const analyst = rows.map((r) => fin(r.recommendation));
     columns.x_analyst = analyst;
-    axes.set('x_analyst', axisFrom({ id: 'x_analyst', labelEn: 'Analyst consensus', labelZh: '分析师共识（1 卖 — 5 买）', section: 'Sentiment', role: 'feature', kind: 'linear', format: 'ratio', domain: [1, 5] }, analyst));
+    axes.set('x_analyst', axisFrom({ id: 'x_analyst', labelEn: 'Analyst consensus', labelZh: '分析师共识（1 卖 — 5 买）', section: 'Sentiment', role: 'feature', kind: 'linear', format: 'ratio', domain: [1, 5], verified: true }, analyst, reasonFor(analyst, false)));
 
     const retro = new Map<Planet, boolean>();
     const rulers = rows.map((r) => rulerForIndustry(r.industry));
@@ -130,17 +147,19 @@ export function buildExplainView(stocks: StockFactorRaw[], selected: string[], a
     axes.set('a_ruler', axisFrom({ ...astroBase, id: 'a_ruler', labelEn: 'Ruling planet', labelZh: '板块守护星（传统对应）' }, columns.a_ruler));
     axes.set('a_ruler_retro', axisFrom({ ...astroBase, id: 'a_ruler_retro', labelEn: 'Ruler motion', labelZh: '守护星顺逆行' }, columns.a_ruler_retro));
 
+    // Finnhub free does not return 1MonthPriceReturnDaily (capture 2026-11-07); use month-to-date instead.
+    // Finnhub free 不返回 1MonthPriceReturnDaily（2026-11-07 捕获确认）；用 monthToDatePriceReturnDaily 代替。
     const outcomes: [string, string, string, (r: StockFactorRaw) => number | null, boolean][] = [
         ['r_today', 'Price today', '今日涨跌（现价 vs 前收）', (r) => fin(r.changePct), true],
-        ['r_1m', 'Price 1 month', '过去 1 月涨跌', (r) => fin(r.metric['1MonthPriceReturnDaily']), false],
-        ['r_1q', 'Price 1 quarter', '过去 1 季涨跌（13 周）', (r) => fin(r.metric['13WeekPriceReturnDaily']), false],
+        ['r_1m', 'Month-to-date return', '本月以来涨跌 (MTD)', (r) => fin(r.metric['monthToDatePriceReturnDaily']), true],
+        ['r_1q', 'Price 1 quarter', '过去 1 季涨跌（13 周）', (r) => fin(r.metric['13WeekPriceReturnDaily']), true],
     ];
     const rank: Record<string, (number | null)[]> = {};
     for (const [id, en, zh, read, verified] of outcomes) {
         const values = rows.map(read);
         columns[id] = values;
         rank[id] = percentileScores(values);
-        axes.set(id, axisFrom({ id, labelEn: en, labelZh: zh, section: 'Price outcome', role: 'outcome', kind: 'linear', format: 'spct', domain: outcomeDomain(values), verified }, values));
+        axes.set(id, axisFrom({ id, labelEn: en, labelZh: zh, section: 'Price outcome', role: 'outcome', kind: 'linear', format: 'spct', domain: outcomeDomain(values), verified }, values, reasonFor(values, false)));
     }
 
     return {

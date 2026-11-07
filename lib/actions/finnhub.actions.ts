@@ -7,6 +7,8 @@ import { QUOTE_TTL_SECONDS } from '@/lib/market-data';
 import { hasFinnhubQuotes } from '@/lib/markets';
 import { getSession } from '@/lib/better-auth/auth';
 import { FACTOR_METRIC_KEYS, type FactorMetricKey } from '@/lib/eye/types';
+import { connectToDatabase } from '@/database/mongoose';
+import { FinnhubMetricSnapshot, FINNHUB_METRIC_TTL_MS } from '@/database/models/finnhub-metric.model';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 // Key pool: each free key has its own 60 req/min, so N keys = N x the quota. Rotated per request.
@@ -155,6 +157,89 @@ async function fetchJSON<T>(url: string, revalidateSeconds = 0): Promise<T> {
     return hit.value as T;
 }
 
+/* -------------------------------------------------------------
+ * DB-first Finnhub metric cache (FinnhubMetricSnapshot, TTL 12h).
+ * English: /eye and the watchlist can fan out 50+ Finnhub calls per page load
+ * and exhaust the free plan's 60/min. Persisting here makes the steady state a
+ * pure Mongo read; live Finnhub only runs on miss or from the warm-up job.
+ * 中文：/eye 和自选页一次页面加载可能发出 50+ 个 Finnhub 请求，撑爆免费版 60/min。
+ * 把 metric=all 响应落库后，稳态只是读 Mongo；只有 miss 或定时预热才真的打 API。
+ * ------------------------------------------------------------- */
+
+export interface FinnhubMetricFromDb {
+    metric: Record<string, number | string | null | undefined> | null;
+    profile: Record<string, unknown> | null;
+    recommendation: Array<Record<string, unknown>> | null;
+    fetchedAt: Date;
+}
+
+/** Read a Finnhub metric snapshot from Mongo if it's fresh (within TTL) and status 200. / 从 Mongo 读快照。 */
+export async function getFinnhubMetricFromDb(symbol: string): Promise<FinnhubMetricFromDb | null> {
+    try {
+        await connectToDatabase();
+    } catch {
+        return null;
+    }
+    const since = new Date(Date.now() - FINNHUB_METRIC_TTL_MS);
+    const doc = await FinnhubMetricSnapshot.findOne({
+        symbol: symbol.toUpperCase(),
+        status: 200,
+        fetchedAt: { $gte: since },
+    }).lean().exec();
+    if (!doc) return null;
+    const d = doc as Record<string, unknown>;
+    return {
+        metric: (d.metric as FinnhubMetricFromDb['metric']) ?? null,
+        profile: (d.profile as FinnhubMetricFromDb['profile']) ?? null,
+        recommendation: (d.recommendation as FinnhubMetricFromDb['recommendation']) ?? null,
+        fetchedAt: (d.fetchedAt as Date) ?? new Date(),
+    };
+}
+
+async function upsertFinnhubMetricSnapshot(
+    symbol: string,
+    payload: {
+        status: number;
+        metric?: Record<string, number | string | null | undefined> | null;
+        profile?: Record<string, unknown> | null;
+        recommendation?: Array<Record<string, unknown>> | null;
+        rawError?: string | null;
+    }
+): Promise<void> {
+    try {
+        await connectToDatabase();
+        const now = new Date();
+        const doc: Record<string, unknown> = {
+            symbol: symbol.toUpperCase(),
+            fetchedAt: now,
+            status: payload.status,
+            metric: payload.metric ?? {},
+            profile: payload.profile ?? null,
+            recommendation: payload.recommendation ?? null,
+            rawError: payload.rawError ?? null,
+            ttlExpiresAt: new Date(now.getTime() + FINNHUB_METRIC_TTL_MS),
+        };
+        // A 429 / network error must not clobber a previously-good 200 snapshot:
+        // only write a non-200 marker when there is no good record yet.
+        // 429/网络错误不能覆盖已有的 200 好记录——只有当前没有好记录时才写非 200 标记。
+        if (payload.status !== 200) {
+            const existing = await FinnhubMetricSnapshot.findOne({
+                symbol: symbol.toUpperCase(),
+                status: 200,
+            }).lean().exec();
+            if (existing) return;
+        }
+        await FinnhubMetricSnapshot.updateOne(
+            { symbol: symbol.toUpperCase() },
+            { $set: doc },
+            { upsert: true }
+        );
+    } catch (e) {
+        // Mongo write failures must never break the user-facing path.
+        console.error('Finnhub metric snapshot upsert failed for', symbol, (e as Error)?.message);
+    }
+}
+
 function getExchangeLabel(symbol: string, exchange?: string) {
     if (exchange?.trim()) {
         return exchange.trim();
@@ -191,10 +276,31 @@ export async function getLiveQuotes(symbols: string[]) {
 export async function getCompanyProfile(symbol: string) {
     // Profiles exist for stocks Finnhub free covers; crypto pairs and non-US listings have none
     if (symbol.includes(':') || !hasFinnhubQuotes(symbol)) return null;
+    // DB-first: serve from the FinnhubMetricSnapshot cache when fresh (TTL 12h).
+    // DB-first：先读 Mongo 缓存（TTL 12h），miss 才实时调用 Finnhub。
+    const fromDb = await getFinnhubMetricFromDb(symbol);
+    if (fromDb?.profile) {
+        const p = fromDb.profile as Record<string, unknown>;
+        return {
+            currency: typeof p.currency === 'string' ? p.currency : undefined,
+            exchange: typeof p.exchange === 'string' ? p.exchange : undefined,
+            logo: typeof p.logo === 'string' ? p.logo : undefined,
+            marketCapitalization: typeof p.marketCapitalization === 'number' ? p.marketCapitalization : undefined,
+            name: typeof p.name === 'string' ? p.name : undefined,
+            ticker: typeof p.ticker === 'string' ? p.ticker : undefined,
+            finnhubIndustry: typeof p.finnhubIndustry === 'string' ? p.finnhubIndustry : undefined,
+            weburl: typeof p.weburl === 'string' ? p.weburl : undefined,
+        } as FinnhubCompanyProfile;
+    }
     try {
         const url = `${FINNHUB_BASE_URL}/stock/profile2?symbol=${encodeURIComponent(symbol)}`;
         // Cache profile for 24 hours
-        return await fetchJSON<FinnhubCompanyProfile>(url, 86400);
+        const profile = await fetchJSON<FinnhubCompanyProfile>(url, 86400);
+        await upsertFinnhubMetricSnapshot(symbol, {
+            status: 200,
+            profile: profile as unknown as Record<string, unknown>,
+        });
+        return profile;
     } catch (e) {
         logFailure('profile', symbol, e);
         return null;
@@ -221,24 +327,73 @@ export async function getStockMetrics(symbol: string): Promise<number | null> {
 }
 
 // Same URL and TTL as getStockMetrics, so both share one cached response and one Finnhub request.
+// DB-first (FinnhubMetricSnapshot, TTL 12h): steady state is a pure Mongo read; the live Finnhub
+// call only runs on miss/backfill or from the Inngest warm-up job. / DB-first：稳态只读 Mongo。
 export async function getStockFactorMetrics(symbol: string): Promise<Partial<Record<FactorMetricKey, number | null>> | null> {
     if (FINNHUB_KEYS.length === 0 || !hasFinnhubQuotes(symbol)) return null;
+
+    const fromDb = await getFinnhubMetricFromDb(symbol);
+    if (fromDb?.metric) {
+        const out: Partial<Record<FactorMetricKey, number | null>> = {};
+        for (const key of FACTOR_METRIC_KEYS) {
+            const v = fromDb.metric[key];
+            out[key] = typeof v === 'number' && Number.isFinite(v) ? v : null;
+        }
+        return out;
+    }
 
     try {
         const url = `${FINNHUB_BASE_URL}/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all`;
         const data = await fetchJSON<FinnhubStockMetrics>(url, 3600);
         const metric = data?.metric;
-        if (!metric) return null;
+        if (!metric) {
+            await upsertFinnhubMetricSnapshot(symbol, { status: 0, metric: null, rawError: 'empty metric' });
+            return null;
+        }
         const out: Partial<Record<FactorMetricKey, number | null>> = {};
         for (const key of FACTOR_METRIC_KEYS) {
             const v = metric[key];
             out[key] = typeof v === 'number' && Number.isFinite(v) ? v : null;
         }
+        await upsertFinnhubMetricSnapshot(symbol, {
+            status: 200,
+            metric: metric as Record<string, number | string | null | undefined>,
+        });
         return out;
     } catch (error) {
         logFailure('factor metrics', symbol, error);
+        await upsertFinnhubMetricSnapshot(symbol, {
+            status: 0,
+            rawError: error instanceof Error ? error.message : String(error),
+        });
         return null;
     }
+}
+
+/**
+ * Pre-warm the FinnhubMetricSnapshot cache for Inngest (serial, 1s pacing).
+ * English: used by `warmFinnhubMetricCacheJob` every 6h. Bypasses the DB check so
+ * stale entries are refreshed; never throws — per-symbol failures are logged.
+ * 中文：供 Inngest 每 6 小时调用，串行 + 1s 间隔预热 watchlist 标的，绕过 DB 检查强制刷新。
+ */
+export async function warmFinnhubMetricCache(symbols: string[]): Promise<{ ok: number; failed: number }> {
+    let ok = 0;
+    let failed = 0;
+    for (const raw of symbols) {
+        const symbol = raw.toUpperCase();
+        if (!hasFinnhubQuotes(symbol)) continue;
+        const [profileResult, metricResult] = await Promise.allSettled([
+            getCompanyProfile(symbol),
+            getStockFactorMetrics(symbol),
+        ]);
+        // getCompanyProfile/getStockFactorMetrics already write to Mongo on success;
+        // here we also record a non-200 marker if both failed and no snapshot exists.
+        const goods = [profileResult.status === 'fulfilled' && profileResult.value !== null,
+            metricResult.status === 'fulfilled' && metricResult.value !== null];
+        if (goods.some(Boolean)) ok++;
+        else failed++;
+    }
+    return { ok, failed };
 }
 
 // Companies Finnhub groups with this one (same industry). Endpoint availability on the free plan is unverified.
@@ -257,13 +412,32 @@ export async function getStockPeers(symbol: string): Promise<string[]> {
     }
 }
 
-// Latest analyst consensus mapped to 1 (strong sell) .. 5 (strong buy). Free-plan access is unverified.
+// Latest analyst consensus mapped to 1 (strong sell) .. 5 (strong buy). Free-plan access verified 2026-11-07:
+// /stock/recommendation returns 200 with rows on free; /stock/price-target is 403 on free and is NOT used.
+// DB-first: steady state reads the FinnhubMetricSnapshot recommendation payload (TTL 12h).
 export async function getStockRecommendation(symbol: string): Promise<number | null> {
     if (FINNHUB_KEYS.length === 0 || !hasFinnhubQuotes(symbol)) return null;
+
+    const fromDb = await getFinnhubMetricFromDb(symbol);
+    if (fromDb?.recommendation && fromDb.recommendation.length) {
+        const rows = fromDb.recommendation as Array<{ period?: string; strongBuy?: number; buy?: number; hold?: number; sell?: number; strongSell?: number }>;
+        const latest = [...rows].sort((a, b) => String(b.period).localeCompare(String(a.period)))[0];
+        if (latest) {
+            const counts = [latest.strongSell, latest.sell, latest.hold, latest.buy, latest.strongBuy].map((n) => (typeof n === 'number' && n > 0 ? n : 0));
+            const total = counts.reduce((a, b) => a + b, 0);
+            if (total > 0) return counts.reduce((sum, n, i) => sum + n * (i + 1), 0) / total;
+        }
+    }
 
     try {
         const url = `${FINNHUB_BASE_URL}/stock/recommendation?symbol=${encodeURIComponent(symbol)}`;
         const rows = await fetchJSON<{ period?: string; strongBuy?: number; buy?: number; hold?: number; sell?: number; strongSell?: number }[]>(url, 3600);
+        if (Array.isArray(rows) && rows.length) {
+            await upsertFinnhubMetricSnapshot(symbol, {
+                status: 200,
+                recommendation: rows as unknown as Array<Record<string, unknown>>,
+            });
+        }
         const latest = Array.isArray(rows) ? [...rows].sort((a, b) => String(b.period).localeCompare(String(a.period)))[0] : undefined;
         if (!latest) return null;
         const counts = [latest.strongSell, latest.sell, latest.hold, latest.buy, latest.strongBuy].map((n) => (typeof n === 'number' && n > 0 ? n : 0));

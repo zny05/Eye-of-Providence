@@ -6,6 +6,11 @@ export type CellValue = number | string | null;
 // feature = explains; outcome = the observed price result (never scored or weighted); astro = symbolic layer.
 export type AxisRole = 'feature' | 'outcome' | 'astro';
 
+// Why an axis might be empty, so the UI can explain itself instead of rendering an ambiguous gap.
+// ok = values present; fetch-failed = the live request failed (429/403/timeout); no-data = request
+// succeeded but every reading for this field was null (wrong field name, or a symbol with no fundamentals).
+export type AxisReason = 'ok' | 'fetch-failed' | 'no-data';
+
 export interface PcpAxis {
     id: string;
     labelEn: string;
@@ -22,6 +27,8 @@ export interface PcpAxis {
     hasMissing: boolean;
     verified: boolean;
     approx?: string;
+    /** Why the axis might be empty, so the header can explain itself. Default 'ok'. */
+    reason: AxisReason;
 }
 
 export interface PcpTable {
@@ -51,10 +58,11 @@ export const FACTOR_METRIC_KEYS = [
     'grossMarginTTM',
     'netProfitMarginTTM',
     'totalDebt/totalEquityQuarterly',
+    'marketCapitalization',
     '26WeekPriceReturnDaily',
     '13WeekPriceReturnDaily',
     '52WeekPriceReturnDaily',
-    '1MonthPriceReturnDaily',
+    'monthToDatePriceReturnDaily',
     '52WeekHigh',
     '52WeekLow',
     'beta',
