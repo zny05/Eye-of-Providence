@@ -290,12 +290,13 @@ export async function getLiveQuotes(symbols: string[]) {
     return Object.fromEntries(symbols.map((s, i) => [s, quotes[i]?.c ? quotes[i] : null]));
 }
 
-export async function getCompanyProfile(symbol: string) {
+export async function getCompanyProfile(symbol: string, opts?: { forceRefresh?: boolean }) {
     // Profiles exist for stocks Finnhub free covers; crypto pairs and non-US listings have none
     if (symbol.includes(':') || !hasFinnhubQuotes(symbol)) return null;
-    // DB-first: serve from the FinnhubMetricSnapshot cache when fresh (TTL 12h).
-    // DB-first：先读 Mongo 缓存（TTL 12h），miss 才实时调用 Finnhub。
-    const fromDb = await getFinnhubMetricFromDb(symbol);
+    // DB-first: serve from the FinnhubMetricSnapshot cache when fresh (TTL 12h). The warm-up job
+    // passes forceRefresh so the 6h cron actually refreshes instead of reading the 12h cache.
+    // DB-first：先读 Mongo 缓存（TTL 12h）；forceRefresh 时绕过检查，重新打 Finnhub。
+    const fromDb = opts?.forceRefresh ? null : await getFinnhubMetricFromDb(symbol);
     if (fromDb?.profile) {
         const p = fromDb.profile as Record<string, unknown>;
         return {
@@ -346,10 +347,10 @@ export async function getStockMetrics(symbol: string): Promise<number | null> {
 // Same URL and TTL as getStockMetrics, so both share one cached response and one Finnhub request.
 // DB-first (FinnhubMetricSnapshot, TTL 12h): steady state is a pure Mongo read; the live Finnhub
 // call only runs on miss/backfill or from the Inngest warm-up job. / DB-first：稳态只读 Mongo。
-export async function getStockFactorMetrics(symbol: string): Promise<Partial<Record<FactorMetricKey, number | null>> | null> {
+export async function getStockFactorMetrics(symbol: string, opts?: { forceRefresh?: boolean }): Promise<Partial<Record<FactorMetricKey, number | null>> | null> {
     if (FINNHUB_KEYS.length === 0 || !hasFinnhubQuotes(symbol)) return null;
 
-    const fromDb = await getFinnhubMetricFromDb(symbol);
+    const fromDb = opts?.forceRefresh ? null : await getFinnhubMetricFromDb(symbol);
     if (fromDb?.metric) {
         const out: Partial<Record<FactorMetricKey, number | null>> = {};
         for (const key of FACTOR_METRIC_KEYS) {
@@ -399,14 +400,17 @@ export async function warmFinnhubMetricCache(symbols: string[]): Promise<{ ok: n
     for (const raw of symbols) {
         const symbol = raw.toUpperCase();
         if (!hasFinnhubQuotes(symbol)) continue;
-        const [profileResult, metricResult] = await Promise.allSettled([
-            getCompanyProfile(symbol),
-            getStockFactorMetrics(symbol),
+        const [profileResult, metricResult, recommendationResult] = await Promise.allSettled([
+            getCompanyProfile(symbol, { forceRefresh: true }),
+            getStockFactorMetrics(symbol, { forceRefresh: true }),
+            getStockRecommendation(symbol, { forceRefresh: true }),
         ]);
-        // getCompanyProfile/getStockFactorMetrics already write to Mongo on success;
-        // here we also record a non-200 marker if both failed and no snapshot exists.
-        const goods = [profileResult.status === 'fulfilled' && profileResult.value !== null,
-            metricResult.status === 'fulfilled' && metricResult.value !== null];
+        // All three getters already write to Mongo on success; here we only count.
+        const goods = [
+            profileResult.status === 'fulfilled' && profileResult.value !== null,
+            metricResult.status === 'fulfilled' && metricResult.value !== null,
+            recommendationResult.status === 'fulfilled' && recommendationResult.value !== null,
+        ];
         if (goods.some(Boolean)) ok++;
         else failed++;
     }
@@ -432,10 +436,10 @@ export async function getStockPeers(symbol: string): Promise<string[]> {
 // Latest analyst consensus mapped to 1 (strong sell) .. 5 (strong buy). Free-plan access verified 2026-11-07:
 // /stock/recommendation returns 200 with rows on free; /stock/price-target is 403 on free and is NOT used.
 // DB-first: steady state reads the FinnhubMetricSnapshot recommendation payload (TTL 12h).
-export async function getStockRecommendation(symbol: string): Promise<number | null> {
+export async function getStockRecommendation(symbol: string, opts?: { forceRefresh?: boolean }): Promise<number | null> {
     if (FINNHUB_KEYS.length === 0 || !hasFinnhubQuotes(symbol)) return null;
 
-    const fromDb = await getFinnhubMetricFromDb(symbol);
+    const fromDb = opts?.forceRefresh ? null : await getFinnhubMetricFromDb(symbol);
     if (fromDb?.recommendation && fromDb.recommendation.length) {
         const rows = fromDb.recommendation as Array<{ period?: string; strongBuy?: number; buy?: number; hold?: number; sell?: number; strongSell?: number }>;
         const latest = [...rows].sort((a, b) => String(b.period).localeCompare(String(a.period)))[0];
