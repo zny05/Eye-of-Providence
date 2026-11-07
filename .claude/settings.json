@@ -28,7 +28,10 @@
       "Read(//c/Users/HadesCanyon/.claude/projects/c--Users-HadesCanyon-Downloads-Eye-of-Providence/5dcaa46c-a8bc-4105-9f37-66f51346913d/tool-results/**)",
       "Skill(firecrawl)",
       "Skill(firecrawl:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(Remove-Item -LiteralPath \"lib/eye/stock-view.ts\" -Force)",
+      "Bash(Test-Path \"lib/eye/stock-view.ts\")",
+      "Bash(echo \"exit:$?\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\HadesCanyon\\.claude\\projects\\c--Users-HadesCanyon-Downloads-Eye-of-Providence"
