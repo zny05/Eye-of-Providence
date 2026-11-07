@@ -237,18 +237,17 @@ async function upsertFinnhubMetricSnapshot(
         if (payload.metric != null) updates.metric = payload.metric;
         if (payload.profile != null) updates.profile = payload.profile;
         if (payload.recommendation != null) updates.recommendation = payload.recommendation;
-        const inc = { fetchedAt: now as unknown as number, ttlExpiresAt: new Date(now.getTime() + FINNHUB_METRIC_TTL_MS) as unknown as number };
         if (payload.status === 200 && Object.keys(updates).length > 0) {
             await FinnhubMetricSnapshot.updateOne(
                 { symbol: symbol.toUpperCase() },
-                { $set: { ...updates, status: 200, fetchedAt: now }, $inc: inc },
+                { $set: { ...updates, status: 200, fetchedAt: now, ttlExpiresAt: new Date(now.getTime() + FINNHUB_METRIC_TTL_MS) } },
                 { upsert: true }
             );
             void doc;
         } else {
             await FinnhubMetricSnapshot.updateOne(
                 { symbol: symbol.toUpperCase() },
-                { $set: { ...doc, ...updates }, $inc: inc },
+                { $set: { ...doc, ...updates } },
                 { upsert: true }
             );
         }
