@@ -229,11 +229,29 @@ async function upsertFinnhubMetricSnapshot(
             }).lean().exec();
             if (existing) return;
         }
-        await FinnhubMetricSnapshot.updateOne(
-            { symbol: symbol.toUpperCase() },
-            { $set: doc },
-            { upsert: true }
-        );
+        // Merge, don't replace: a profile-only write must not wipe a previously cached metric,
+        // and a recommendation-only write must not wipe the cached profile. Only fields the
+        // caller actually passed are set; the rest keep their cached values.
+        // 只写调用方传入的字段，剩下的保留缓存，避免 profile 写清掉 metric 等。
+        const updates: Record<string, unknown> = {};
+        if (payload.metric != null) updates.metric = payload.metric;
+        if (payload.profile != null) updates.profile = payload.profile;
+        if (payload.recommendation != null) updates.recommendation = payload.recommendation;
+        const inc = { fetchedAt: now as unknown as number, ttlExpiresAt: new Date(now.getTime() + FINNHUB_METRIC_TTL_MS) as unknown as number };
+        if (payload.status === 200 && Object.keys(updates).length > 0) {
+            await FinnhubMetricSnapshot.updateOne(
+                { symbol: symbol.toUpperCase() },
+                { $set: { ...updates, status: 200, fetchedAt: now }, $inc: inc },
+                { upsert: true }
+            );
+            void doc;
+        } else {
+            await FinnhubMetricSnapshot.updateOne(
+                { symbol: symbol.toUpperCase() },
+                { $set: { ...doc, ...updates }, $inc: inc },
+                { upsert: true }
+            );
+        }
     } catch (e) {
         // Mongo write failures must never break the user-facing path.
         console.error('Finnhub metric snapshot upsert failed for', symbol, (e as Error)?.message);
