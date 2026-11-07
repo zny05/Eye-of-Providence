@@ -14,8 +14,9 @@ export function formatValue(format: ValueFormat, value: number | null | undefine
     switch (format) {
         case 'score': return value.toFixed(0);
         case 'pct': return `${value.toFixed(1)}%`;
+        case 'spct': return `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
         case 'ratio': return value.toFixed(2);
-        // Finnhub market cap is in USD millions
+        // Finnhub market cap and volume-based figures are in USD millions
         case 'usdM': return `$${compact(value * 1e6)}`;
         default: return Number.isInteger(value) ? String(value) : value.toFixed(2);
     }
@@ -24,6 +25,6 @@ export function formatValue(format: ValueFormat, value: number | null | undefine
 // Tick labels: short and unit-free.
 export function formatTick(format: ValueFormat, value: number): string {
     if (format === 'usdM') return `$${compact(value * 1e6, 0)}`;
-    if (format === 'pct') return `${Number(value.toFixed(1))}%`;
+    if (format === 'pct' || format === 'spct') return `${Number(value.toFixed(1))}%`;
     return String(Number(value.toFixed(2)));
 }

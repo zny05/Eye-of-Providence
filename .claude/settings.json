@@ -27,7 +27,8 @@
       "Bash(cat /c/Users/HadesCanyon/.claude/projects/c--Users-HadesCanyon-Downloads-Eye-of-Providence/5dcaa46c-a8bc-4105-9f37-66f51346913d/tool-results/bihqoni05.txt | head -c 10000)",
       "Read(//c/Users/HadesCanyon/.claude/projects/c--Users-HadesCanyon-Downloads-Eye-of-Providence/5dcaa46c-a8bc-4105-9f37-66f51346913d/tool-results/**)",
       "Skill(firecrawl)",
-      "Skill(firecrawl:*)"
+      "Skill(firecrawl:*)",
+      "WebSearch"
     ],
     "additionalDirectories": [
       "C:\\Users\\HadesCanyon\\.claude\\projects\\c--Users-HadesCanyon-Downloads-Eye-of-Providence"

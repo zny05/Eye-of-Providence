@@ -3,32 +3,30 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AxisRow from '@/components/eye/pcp/AxisRow';
 import { useElementSize } from '@/hooks/useElementSize';
-import { countMatches } from '@/lib/eye/brush';
 import { formatValue } from '@/lib/eye/format';
 import { categoricalPositions, layoutCategoricalAxis, type CatBand } from '@/lib/eye/pcp/categorical-layout';
-import { EYE_THEME, groupColorMap, hexToRgb, lineAlpha, NO_GROUP_COLOR, rampRgb, rgba } from '@/lib/eye/pcp/color-scale';
+import { EYE_THEME, hexToRgb, rgba, SELECTED_PALETTE } from '@/lib/eye/pcp/color-scale';
 import { computeGeometry, valueToT, xFromT, yOf } from '@/lib/eye/pcp/geometry';
 import { nearestPolyline } from '@/lib/eye/pcp/hit-test';
-import type { BrushRange, BrushState, CellValue, PcpAxis, PcpTable } from '@/lib/eye/types';
+import type { CellValue, PcpAxis, PcpTable } from '@/lib/eye/types';
 
 interface Props {
     axes: PcpAxis[];
+    catalog: PcpAxis[];
     table: PcpTable;
-    matched: Uint8Array;
-    brushes: BrushState;
     reversed: Record<string, boolean>;
-    colorAxis: PcpAxis | null; // null = colour by group
-    pupil?: string;
     hoverId?: string;
-    onlyMatched: boolean;
-    onRangesChange: (axisId: string, ranges: BrushRange[]) => void;
+    canRemoveAxis: boolean;
     onToggleReverse: (axisId: string) => void;
     onMoveAxis: (axisId: string, toIndex: number) => void;
-    onPupilChange: (id: string | undefined) => void;
+    onReplaceAxis: (oldId: string, newId: string) => void;
+    onRemoveAxis: (axisId: string) => void;
     onHoverChange: (id: string | undefined) => void;
+    onAddSymbol: (id: string) => void; // clicking a grey peer line selects it
+    canAdd: boolean;
 }
 
-type Rgb = [number, number, number];
+const PEER_ALPHA = 0.16;
 
 function strokeRow(ctx: CanvasRenderingContext2D, xs: Float32Array, row: number, n: number, ys: number[], naX: number | null) {
     const base = row * n;
@@ -47,7 +45,7 @@ function strokeRow(ctx: CanvasRenderingContext2D, xs: Float32Array, row: number,
         const m1 = Number.isNaN(xs[base + a]);
         const m2 = Number.isNaN(xs[base + a + 1]);
         if ((m1 || m2) && naX === null) continue;
-        ctx.setLineDash(m1 || m2 ? [3, 3] : []);
+        ctx.setLineDash(m1 || m2 ? [4, 4] : []);
         ctx.beginPath();
         ctx.moveTo(m1 ? naX! : xs[base + a], ys[a]);
         ctx.lineTo(m2 ? naX! : xs[base + a + 1], ys[a + 1]);
@@ -64,18 +62,15 @@ function prepareCanvas(canvas: HTMLCanvasElement, w: number, h: number) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
     ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
     return ctx;
 }
 
-export default function ParallelCoordinatesVertical({
-    axes, table, matched, brushes, reversed, colorAxis, pupil, hoverId, onlyMatched,
-    onRangesChange, onToggleReverse, onMoveAxis, onPupilChange, onHoverChange,
-}: Props) {
+export default function ParallelCoordinatesVertical({ axes, catalog, table, reversed, hoverId, canRemoveAxis, onToggleReverse, onMoveAxis, onReplaceAxis, onRemoveAxis, onHoverChange, onAddSymbol, canAdd }: Props) {
     const [sizeRef, size] = useElementSize<HTMLDivElement>();
     const stageRef = useRef<HTMLDivElement>(null);
     const baseRef = useRef<HTMLCanvasElement>(null);
     const overlayRef = useRef<HTMLCanvasElement>(null);
-    const pointerType = useRef('mouse');
     const frame = useRef(0);
     const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
 
@@ -85,9 +80,9 @@ export default function ParallelCoordinatesVertical({
     const g = useMemo(() => computeGeometry(size.width, n, anyMissing), [size.width, n, anyMissing]);
     const ys = useMemo(() => axes.map((_, i) => yOf(i, g)), [axes, g]);
     const rowIndex = useMemo(() => new Map(table.ids.map((id, i) => [id, i])), [table.ids]);
-    const matchedCount = countMatches(matched);
+    const usedIds = useMemo(() => axes.map((a) => a.id), [axes]);
 
-    // x of every row on every axis. Recomputed on axis order, width and reversal only; brushing never touches it.
+    // x of every row on every axis (NaN = no reading). Recomputed on axis order, width and reversal only.
     const { xs, bands } = useMemo(() => {
         const out = new Float32Array(rowCount * n).fill(NaN);
         const bandMap = new Map<string, CatBand[]>();
@@ -113,118 +108,106 @@ export default function ParallelCoordinatesVertical({
         return { xs: out, bands: bandMap };
     }, [axes, table.columns, rowCount, n, g, reversed]);
 
-    // Line colour: group palette or the sequential ramp on the chosen axis.
-    const { rowRgb, drawOrder } = useMemo(() => {
-        const groups = groupColorMap(table.group);
-        const fallback = hexToRgb(NO_GROUP_COLOR);
-        const keys: number[] = new Array(rowCount).fill(-1);
-        let rgb: Rgb[];
-        if (colorAxis && colorAxis.kind !== 'categorical') {
-            const col = table.columns[colorAxis.id] ?? [];
-            rgb = col.map((v, i) => {
-                const t = valueToT(colorAxis.kind as 'linear' | 'log', typeof v === 'number' ? v : null, colorAxis.domain);
-                keys[i] = t ?? -1;
-                return t === null ? fallback : rampRgb(t);
-            });
-        } else {
-            rgb = table.group.map((grp) => (grp !== null && groups.get(grp) ? hexToRgb(groups.get(grp)!) : fallback));
+    // Categories that hold a selected instrument, per categorical axis.
+    const selectedKeys = useMemo(() => {
+        const map = new Map<string, string[]>();
+        for (const axis of axes) {
+            if (axis.kind !== 'categorical') continue;
+            const keys = new Set<string>();
+            (table.columns[axis.id] ?? []).forEach((v, r) => { if (typeof v === 'string' && table.selectedIndex[r] !== null) keys.add(v); });
+            map.set(axis.id, [...keys]);
         }
-        // Higher colour value on top, so strong rows stay visible in a dense plot.
-        const order = Array.from({ length: rowCount }, (_, i) => i).sort((a, b) => keys[a] - keys[b]);
-        return { rowRgb: rgb, drawOrder: order };
-    }, [colorAxis, table.columns, table.group, rowCount]);
+        return map;
+    }, [axes, table.columns, table.selectedIndex]);
+
+    const rowRgb = useMemo(
+        () => table.selectedIndex.map((s) => hexToRgb(s === null ? EYE_THEME.lineDim : SELECTED_PALETTE[s % SELECTED_PALETTE.length])),
+        [table.selectedIndex],
+    );
 
     useEffect(() => {
         const canvas = baseRef.current;
         if (!canvas || !size.width || n < 2) return;
         const ctx = prepareCanvas(canvas, g.W, g.H);
-        const allMatch = matchedCount === rowCount;
 
-        if (!onlyMatched && !allMatch) {
-            ctx.strokeStyle = rgba(hexToRgb(EYE_THEME.lineDim), 0.07);
-            ctx.lineWidth = 1;
-            for (let r = 0; r < rowCount; r++) if (!matched[r]) strokeRow(ctx, xs, r, n, ys, g.naLaneCenter);
-        }
-        const alpha = lineAlpha(matchedCount);
+        // Peers first, as a quiet backdrop.
+        ctx.strokeStyle = rgba(hexToRgb(EYE_THEME.lineDim), PEER_ALPHA);
         ctx.lineWidth = 1;
-        for (const r of drawOrder) {
-            if (!matched[r]) continue;
-            ctx.strokeStyle = rgba(rowRgb[r], alpha);
+        for (let r = 0; r < rowCount; r++) if (table.selectedIndex[r] === null) strokeRow(ctx, xs, r, n, ys, g.naLaneCenter);
+
+        // Selected lines: dark halo, colour, then a dot on every track. The first selection is drawn last, on top.
+        const selected = table.selectedIndex.map((s, r) => ({ s, r })).filter((e): e is { s: number; r: number } => e.s !== null).sort((a, b) => b.s - a.s);
+        for (const { r } of selected) {
+            ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+            ctx.lineWidth = 5;
             strokeRow(ctx, xs, r, n, ys, g.naLaneCenter);
+            ctx.strokeStyle = rgba(rowRgb[r], 1);
+            ctx.lineWidth = 3;
+            strokeRow(ctx, xs, r, n, ys, g.naLaneCenter);
+            ctx.fillStyle = rgba(rowRgb[r], 1);
+            ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+            ctx.lineWidth = 1.5;
+            for (let a = 0; a < n; a++) {
+                const x = xs[r * n + a];
+                if (Number.isNaN(x)) continue;
+                ctx.beginPath();
+                ctx.arc(x, ys[a], 4.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            }
         }
-    }, [xs, ys, g, n, size.width, rowCount, matched, matchedCount, onlyMatched, drawOrder, rowRgb]);
+    }, [xs, ys, g, n, size.width, rowCount, table.selectedIndex, rowRgb]);
 
     useEffect(() => {
         const canvas = overlayRef.current;
         if (!canvas || !size.width || n < 2) return;
         const ctx = prepareCanvas(canvas, g.W, g.H);
-        const drawLine = (id: string | undefined, width: number, color: string, halo: boolean) => {
-            const r = id === undefined ? undefined : rowIndex.get(id);
-            if (r === undefined) return;
-            if (halo) {
-                ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-                ctx.lineWidth = width + 3;
-                strokeRow(ctx, xs, r, n, ys, g.naLaneCenter);
-            }
-            ctx.strokeStyle = color;
-            ctx.lineWidth = width;
-            strokeRow(ctx, xs, r, n, ys, g.naLaneCenter);
-            if (halo) {
-                ctx.fillStyle = rgba(rowRgb[r], 1);
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 1.5;
-                for (let a = 0; a < n; a++) {
-                    const x = xs[r * n + a];
-                    if (Number.isNaN(x)) continue;
-                    ctx.beginPath();
-                    ctx.arc(x, ys[a], 4.5, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.stroke();
-                }
-            }
-        };
-        if (hoverId !== pupil) drawLine(hoverId, 2.5, '#fafafa', false);
-        drawLine(pupil, 3, '#ffffff', true);
-    }, [xs, ys, g, n, size.width, hoverId, pupil, rowIndex, rowRgb]);
+        const r = hoverId === undefined ? undefined : rowIndex.get(hoverId);
+        if (r === undefined) return;
+        ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+        ctx.lineWidth = table.selectedIndex[r] === null ? 4 : 6;
+        strokeRow(ctx, xs, r, n, ys, g.naLaneCenter);
+        ctx.strokeStyle = '#fafafa';
+        ctx.lineWidth = table.selectedIndex[r] === null ? 2 : 3;
+        strokeRow(ctx, xs, r, n, ys, g.naLaneCenter);
+    }, [xs, ys, g, n, size.width, hoverId, rowIndex, table.selectedIndex]);
 
     useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
-    const hit = useCallback((px: number, py: number, threshold: number) =>
-        nearestPolyline(xs, rowCount, n, ys, px, py, threshold, (r) => !matched[r]), [xs, rowCount, n, ys, matched]);
-
-    const localPoint = (e: React.PointerEvent | React.MouseEvent) => {
+    const hit = useCallback((px: number, py: number, threshold: number) => nearestPolyline(xs, rowCount, n, ys, px, py, threshold), [xs, rowCount, n, ys]);
+    const point = (e: React.PointerEvent | React.MouseEvent) => {
         const rect = stageRef.current!.getBoundingClientRect();
         return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     };
-    const isInteractive = (e: React.SyntheticEvent) => !!(e.target as Element).closest('[data-eye-interactive]');
+    const interactive = (e: React.SyntheticEvent) => !!(e.target as Element).closest('[data-eye-interactive]');
+    const pointer = useRef('mouse');
 
     const onPointerMove = (e: React.PointerEvent) => {
-        pointerType.current = e.pointerType;
+        pointer.current = e.pointerType;
         if (e.pointerType !== 'mouse') return;
-        if (isInteractive(e)) {
+        if (interactive(e)) {
             if (hoverId !== undefined) onHoverChange(undefined);
             return;
         }
-        const { x, y } = localPoint(e);
+        const { x, y } = point(e);
         cancelAnimationFrame(frame.current);
         frame.current = requestAnimationFrame(() => {
-            const r = hit(x, y, 6);
+            const r = hit(x, y, 7);
             onHoverChange(r === null ? undefined : table.ids[r]);
             setCursor({ x, y });
         });
     };
 
     const onClick = (e: React.MouseEvent) => {
-        if (isInteractive(e)) return;
-        const { x, y } = localPoint(e);
-        const r = hit(x, y, pointerType.current === 'mouse' ? 6 : 12);
-        if (r === null) return;
-        const id = table.ids[r];
-        onPupilChange(id === pupil ? undefined : id);
+        if (interactive(e)) return;
+        const { x, y } = point(e);
+        const r = hit(x, y, pointer.current === 'mouse' ? 7 : 14);
+        if (r !== null && table.selectedIndex[r] === null && canAdd) onAddSymbol(table.ids[r]);
     };
 
     const tipRow = hoverId !== undefined ? rowIndex.get(hoverId) : undefined;
-    const summary = `Parallel coordinates, ${n} axes, ${matchedCount} of ${rowCount} rows match`;
+    const tipSelected = tipRow !== undefined && table.selectedIndex[tipRow] !== null;
+    const summary = `Parallel coordinates with ${n} axes: ${table.selectedIndex.filter((s) => s !== null).length} selected instruments and ${table.selectedIndex.filter((s) => s === null).length} background peers`;
 
     return (
         <div ref={sizeRef} className="w-full overflow-x-auto">
@@ -232,7 +215,7 @@ export default function ParallelCoordinatesVertical({
                 <div
                     ref={stageRef}
                     className="relative"
-                    style={{ width: g.W, height: g.H, ['--eye-brush' as string]: EYE_THEME.brush, cursor: hoverId ? 'pointer' : undefined }}
+                    style={{ width: g.W, height: g.H, cursor: hoverId && !tipSelected && canAdd ? 'copy' : undefined }}
                     onPointerMove={onPointerMove}
                     onPointerLeave={() => onHoverChange(undefined)}
                     onClick={onClick}
@@ -249,32 +232,37 @@ export default function ParallelCoordinatesVertical({
                             y={ys[i]}
                             g={g}
                             column={table.columns[axis.id] ?? []}
-                            matched={matched}
-                            ranges={brushes[axis.id] ?? []}
                             reversed={!!reversed[axis.id]}
                             bands={bands.get(axis.id) ?? null}
-                            onRangesChange={onRangesChange}
+                            selectedKeys={selectedKeys.get(axis.id) ?? []}
+                            catalog={catalog}
+                            usedIds={usedIds}
+                            canRemove={canRemoveAxis}
                             onToggleReverse={onToggleReverse}
                             onMoveAxis={onMoveAxis}
+                            onReplaceAxis={onReplaceAxis}
+                            onRemoveAxis={onRemoveAxis}
                         />
                     ))}
 
                     {tipRow !== undefined && cursor && (
                         <div
-                            className="pointer-events-none absolute z-20 w-[230px] rounded-lg border border-line-strong bg-card/95 p-2.5 text-[12px] shadow-xl"
-                            style={{ left: Math.min(cursor.x + 14, Math.max(0, g.W - 240)), top: cursor.y + 14 }}
+                            className="pointer-events-none absolute z-20 w-[240px] rounded-lg border border-line-strong bg-card/95 p-2.5 text-[12px] shadow-xl"
+                            style={{ left: Math.min(cursor.x + 14, Math.max(0, g.W - 250)), top: cursor.y + 14 }}
                         >
-                            <p className="truncate font-semibold text-foreground">{table.labels[tipRow]}</p>
-                            {table.group[tipRow] && <p className="truncate text-faint">{table.group[tipRow]}</p>}
+                            <p className="truncate font-semibold text-foreground">
+                                <span className="mono mr-1.5">{table.ids[tipRow]}</span>{table.labels[tipRow] !== table.ids[tipRow] ? table.labels[tipRow] : ''}
+                            </p>
+                            <p className="truncate text-faint">{table.group[tipRow] ?? 'Industry unknown'}{!tipSelected && canAdd ? ' · click to add' : ''}</p>
                             <dl className="mt-1.5 grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5">
-                                {axes.filter((a) => a.kind !== 'categorical').map((a) => {
+                                {axes.map((a) => {
                                     const v = table.columns[a.id]?.[tipRow];
                                     const raw = table.raw[a.id]?.[tipRow];
                                     return (
                                         <React.Fragment key={a.id}>
                                             <dt className="truncate text-faint">{a.labelEn}</dt>
                                             <dd className="num text-right text-foreground">
-                                                {formatValue(a.format, typeof v === 'number' ? v : null)}
+                                                {a.kind === 'categorical' ? (typeof v === 'string' ? v : '—') : formatValue(a.format, typeof v === 'number' ? v : null)}
                                                 {a.isScore && typeof raw === 'number' && <span className="text-faint"> ({formatValue(a.rawFormat ?? 'num', raw)})</span>}
                                             </dd>
                                         </React.Fragment>

@@ -241,6 +241,40 @@ export async function getStockFactorMetrics(symbol: string): Promise<Partial<Rec
     }
 }
 
+// Companies Finnhub groups with this one (same industry). Endpoint availability on the free plan is unverified.
+export async function getStockPeers(symbol: string): Promise<string[]> {
+    if (FINNHUB_KEYS.length === 0 || !hasFinnhubQuotes(symbol)) return [];
+
+    try {
+        const url = `${FINNHUB_BASE_URL}/stock/peers?symbol=${encodeURIComponent(symbol)}`;
+        const peers = await fetchJSON<unknown>(url, 86400);
+        return Array.isArray(peers)
+            ? peers.filter((p): p is string => typeof p === 'string' && p !== symbol && !p.includes(':') && hasFinnhubQuotes(p))
+            : [];
+    } catch (error) {
+        logFailure('peers', symbol, error);
+        return [];
+    }
+}
+
+// Latest analyst consensus mapped to 1 (strong sell) .. 5 (strong buy). Free-plan access is unverified.
+export async function getStockRecommendation(symbol: string): Promise<number | null> {
+    if (FINNHUB_KEYS.length === 0 || !hasFinnhubQuotes(symbol)) return null;
+
+    try {
+        const url = `${FINNHUB_BASE_URL}/stock/recommendation?symbol=${encodeURIComponent(symbol)}`;
+        const rows = await fetchJSON<{ period?: string; strongBuy?: number; buy?: number; hold?: number; sell?: number; strongSell?: number }[]>(url, 3600);
+        const latest = Array.isArray(rows) ? [...rows].sort((a, b) => String(b.period).localeCompare(String(a.period)))[0] : undefined;
+        if (!latest) return null;
+        const counts = [latest.strongSell, latest.sell, latest.hold, latest.buy, latest.strongBuy].map((n) => (typeof n === 'number' && n > 0 ? n : 0));
+        const total = counts.reduce((a, b) => a + b, 0);
+        return total === 0 ? null : counts.reduce((sum, n, i) => sum + n * (i + 1), 0) / total;
+    } catch (error) {
+        logFailure('recommendation', symbol, error);
+        return null;
+    }
+}
+
 export async function getWatchlistData(symbols: string[]) {
     if (!symbols || symbols.length === 0) return [];
 

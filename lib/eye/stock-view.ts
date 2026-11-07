@@ -1,46 +1,30 @@
-import { domainFromValues } from '@/lib/eye/pcp/geometry';
+import { isRetrograde, moonState, retrogradePlanets, rulerForIndustry, type MoonState, type Planet } from '@/lib/eye/astro';
 import { meanOfAvailable, percentileScores } from '@/lib/eye/normalize';
-import type { CellValue, PcpAxis, PcpTable, StockFactorRaw, ValueFormat } from '@/lib/eye/types';
-
-type Cluster = 'value' | 'growth' | 'quality' | 'momentum';
-
-interface ScoreDef {
-    id: string;
-    cluster: Cluster;
-    labelEn: string;
-    labelZh: string;
-    layer: string;
-    higherIs: 'better' | 'worse';
-    format: ValueFormat;
-    approx?: string;
-    read: (r: StockFactorRaw) => number | null;
-}
+import { domainFromValues } from '@/lib/eye/pcp/geometry';
+import type { AxisRole, CellValue, PcpAxis, PcpTable, StockFactorRaw, ValueFormat } from '@/lib/eye/types';
 
 const fin = (v: number | null | undefined): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
-// Valuation multiples are shown as yields (E/P, B/P, S/P) so that "higher = cheaper" and losses do not break the axis.
-const yieldOf = (multiple: number | null | undefined, allowNegative = false) => {
-    const m = fin(multiple);
-    if (m === null || m === 0 || (!allowNegative && m < 0)) return null;
-    return 100 / m;
-};
 
-// Finnhub field names are unverified (plan §5.3); a missing field simply leaves the axis empty for that stock.
-const SCORE_DEFS: ScoreDef[] = [
-    { id: 'v_ey', cluster: 'value', labelEn: 'Earnings yield', labelZh: '盈利收益率', layer: 'L2', higherIs: 'better', format: 'pct', read: (r) => yieldOf(r.metric.peTTM, true) },
-    { id: 'v_pb', cluster: 'value', labelEn: 'Book yield (B/P)', labelZh: '净资产收益率倒数', layer: 'L2', higherIs: 'better', format: 'pct', read: (r) => yieldOf(r.metric.pbQuarterly ?? r.metric.pbAnnual) },
-    { id: 'v_ps', cluster: 'value', labelEn: 'Sales yield (S/P)', labelZh: '销售收益率', layer: 'L2', higherIs: 'better', format: 'pct', read: (r) => yieldOf(r.metric.psTTM) },
-    { id: 'v_dy', cluster: 'value', labelEn: 'Dividend yield', labelZh: '股息率', layer: 'L2', higherIs: 'better', format: 'pct', read: (r) => fin(r.metric.dividendYieldIndicatedAnnual) },
-    { id: 'g_rev_yoy', cluster: 'growth', labelEn: 'Revenue growth', labelZh: '营收同比增速', layer: 'L3', higherIs: 'better', format: 'pct', read: (r) => fin(r.metric.revenueGrowthTTMYoy) },
-    { id: 'g_eps_yoy', cluster: 'growth', labelEn: 'EPS growth', labelZh: 'EPS 同比增速', layer: 'L3', higherIs: 'better', format: 'pct', read: (r) => fin(r.metric.epsGrowthTTMYoy) },
-    { id: 'q_roe', cluster: 'quality', labelEn: 'ROE', labelZh: '净资产收益率', layer: 'L4', higherIs: 'better', format: 'pct', read: (r) => fin(r.metric.roeTTM) },
-    { id: 'q_roic', cluster: 'quality', labelEn: 'ROIC (approx.)', labelZh: '近似 ROIC', layer: 'L4', higherIs: 'better', format: 'pct', approx: 'Finnhub roiTTM, not a strict ROIC', read: (r) => fin(r.metric.roiTTM) },
-    { id: 'q_gm', cluster: 'quality', labelEn: 'Gross margin', labelZh: '毛利率', layer: 'L4', higherIs: 'better', format: 'pct', read: (r) => fin(r.metric.grossMarginTTM) },
-    { id: 'q_nm', cluster: 'quality', labelEn: 'Net margin', labelZh: '净利率', layer: 'L4', higherIs: 'better', format: 'pct', read: (r) => fin(r.metric.netProfitMarginTTM) },
-    { id: 'q_lev', cluster: 'quality', labelEn: 'Debt / equity', labelZh: '负债权益比（越低越好）', layer: 'L4', higherIs: 'worse', format: 'ratio', read: (r) => fin(r.metric['totalDebt/totalEquityQuarterly']) },
-    { id: 'p_3m', cluster: 'momentum', labelEn: '13-week return', labelZh: '近 3 月涨幅', layer: 'L5', higherIs: 'better', format: 'pct', read: (r) => fin(r.metric['13WeekPriceReturnDaily']) },
-    { id: 'p_1y', cluster: 'momentum', labelEn: '52-week return', labelZh: '近 1 年涨幅', layer: 'L5', higherIs: 'better', format: 'pct', read: (r) => fin(r.metric['52WeekPriceReturnDaily']) },
+interface ScoredDef {
+    id: string;
+    section: string;
+    labelEn: string;
+    labelZh: string;
+    read: (r: StockFactorRaw) => number | null;
+    rawFormat: ValueFormat;
+    approx?: string;
+}
+
+// Finnhub field names are unverified (report §6.1); a missing field leaves that stock's cell empty.
+const SCORED: ScoredDef[] = [
+    // Earnings yield (E/P) so that "right = cheaper" and a loss-making firm does not break the axis.
+    { id: 'v_ey', section: 'Value', labelEn: 'Earnings yield (E/P)', labelZh: '盈利收益率', rawFormat: 'pct', read: (r) => { const pe = fin(r.metric.peTTM); return pe === null || pe === 0 ? null : 100 / pe; } },
+    { id: 'g_rev_yoy', section: 'Growth', labelEn: 'Revenue growth', labelZh: '营收同比增速', rawFormat: 'pct', read: (r) => fin(r.metric.revenueGrowthTTMYoy) },
+    { id: 'g_eps_yoy', section: 'Growth', labelEn: 'EPS growth', labelZh: 'EPS 同比增速', rawFormat: 'pct', read: (r) => fin(r.metric.epsGrowthTTMYoy) },
+    { id: 'q_roe', section: 'Quality', labelEn: 'ROE', labelZh: '净资产收益率', rawFormat: 'pct', read: (r) => fin(r.metric.roeTTM) },
+    { id: 'q_gm', section: 'Quality', labelEn: 'Gross margin', labelZh: '毛利率', rawFormat: 'pct', read: (r) => fin(r.metric.grossMarginTTM) },
     {
-        id: 'p_52w_pos', cluster: 'momentum', labelEn: '52-week range position', labelZh: '52 周区间位置', layer: 'L5', higherIs: 'better', format: 'pct',
+        id: 'p_52w_pos', section: 'Momentum', labelEn: '52-week range position', labelZh: '52 周区间位置', rawFormat: 'pct',
         read: (r) => {
             const hi = fin(r.metric['52WeekHigh']);
             const lo = fin(r.metric['52WeekLow']);
@@ -48,98 +32,120 @@ const SCORE_DEFS: ScoreDef[] = [
             return hi !== null && lo !== null && px !== null && hi > lo ? Math.min(100, Math.max(0, (100 * (px - lo)) / (hi - lo))) : null;
         },
     },
+    // 26 weeks, not 13: the 13-week return is an outcome axis, and one number must not be both cause and effect.
+    { id: 'p_6m', section: 'Momentum', labelEn: '26-week return', labelZh: '近 6 月涨幅', rawFormat: 'spct', read: (r) => fin(r.metric['26WeekPriceReturnDaily']) },
 ];
 
-const CLUSTERS: { id: string; cluster: Cluster; labelEn: string; labelZh: string; layer: string }[] = [
-    { id: 'k_value', cluster: 'value', labelEn: 'Value', labelZh: '估值', layer: 'L2' },
-    { id: 'k_growth', cluster: 'growth', labelEn: 'Growth', labelZh: '成长', layer: 'L3' },
-    { id: 'k_quality', cluster: 'quality', labelEn: 'Quality', labelZh: '质量', layer: 'L4' },
-    { id: 'k_momentum', cluster: 'momentum', labelEn: 'Momentum', labelZh: '动量', layer: 'L5' },
-];
+const AXIS_ORDER = [
+    'v_ey', 'g_rev_yoy', 'g_eps_yoy', 'q_roe', 'q_gm', 'p_52w_pos', 'p_6m', 'p_beta', 's_mcap', 's_dvol', 'x_analyst',
+    'a_ruler', 'a_ruler_retro', 'r_today', 'r_1m', 'r_1q',
+] as const;
 
-export const STOCK_DEFAULT_AXES = ['industry', 'k_value', 'k_growth', 'k_quality', 'k_momentum', 'composite', 's_mcap'];
+export const OUTCOME_AXIS_IDS = ['r_today', 'r_1m', 'r_1q'] as const;
 
-function scoreAxis(id: string, labelEn: string, labelZh: string, layer: string, column: (number | null)[], extra: Partial<PcpAxis> = {}): PcpAxis {
-    const present = column.filter((v) => v !== null).length;
-    return {
-        id, labelEn, labelZh, layer, kind: 'linear', domain: [0, 100], format: 'score', isScore: true, higherIs: 'better',
-        coverage: column.length ? present / column.length : 0, hasMissing: present < column.length, verified: false, ...extra,
-    };
-}
-
-function rawAxis(id: string, labelEn: string, labelZh: string, layer: string, kind: 'linear' | 'log', format: ValueFormat, column: (number | null)[], extra: Partial<PcpAxis> = {}): PcpAxis {
-    const present = column.filter((v) => v !== null).length;
-    return {
-        id, labelEn, labelZh, layer, kind, domain: domainFromValues(kind, column), format, isScore: false, higherIs: 'neutral',
-        coverage: column.length ? present / column.length : 0, hasMissing: present < column.length, verified: false, ...extra,
-    };
-}
-
-export interface StockView {
+export interface ExplainView {
     axes: PcpAxis[];
     table: PcpTable;
-    skipped: string[]; // symbols without any readable factor
+    skipped: string[]; // selected symbols without any readable data
+    astro: { asOf: string; moon: MoonState; retrograde: Planet[] };
 }
 
-export function buildStockView(stocks: StockFactorRaw[]): StockView {
-    const readings = stocks.map((s) => SCORE_DEFS.map((d) => d.read(s)));
-    const kept = stocks.map((_, i) => readings[i].some((v) => v !== null));
-    const rows = stocks.filter((_, i) => kept[i]);
-    const reading = readings.filter((_, i) => kept[i]);
-    const skipped = stocks.filter((_, i) => !kept[i]).map((s) => s.symbol);
-
-    const scores = new Map<string, (number | null)[]>();
-    const raws = new Map<string, (number | null)[]>();
-    SCORE_DEFS.forEach((d, col) => {
-        const raw = reading.map((r) => r[col]);
-        raws.set(d.id, raw);
-        scores.set(d.id, percentileScores(raw, { higherIsBetter: d.higherIs === 'better' }));
-    });
-
-    const clusterScores = new Map<string, (number | null)[]>();
-    for (const c of CLUSTERS) {
-        const members = SCORE_DEFS.filter((d) => d.cluster === c.cluster).map((d) => scores.get(d.id)!);
-        clusterScores.set(c.id, rows.map((_, i) => meanOfAvailable(members.map((m) => m[i]))));
-    }
-    const composite = rows.map((_, i) => meanOfAvailable(CLUSTERS.map((c) => clusterScores.get(c.id)![i])));
-
-    const mcap = rows.map((r) => fin(r.marketCap) !== null && r.marketCap! > 0 ? r.marketCap : null);
-    const beta = rows.map((r) => fin(r.metric.beta));
-    const industry = rows.map((r) => r.industry?.trim() || null);
-
-    const industryAxis: PcpAxis = {
-        id: 'industry', labelEn: 'Industry (Finnhub)', labelZh: '行业（Finnhub 分类）', layer: 'L8', kind: 'categorical', domain: [0, 1],
-        format: 'num', isScore: false, higherIs: 'neutral', coverage: industry.filter(Boolean).length / Math.max(1, rows.length),
-        hasMissing: industry.some((v) => v === null), verified: true,
+function axisFrom(base: Pick<PcpAxis, 'id' | 'labelEn' | 'labelZh' | 'section' | 'role' | 'kind' | 'format'> & Partial<PcpAxis>, column: CellValue[]): PcpAxis {
+    const present = column.filter((v) => v !== null).length;
+    return {
+        domain: [0, 100], isScore: false, verified: false,
+        coverage: column.length ? present / column.length : 0, hasMissing: present < column.length, ...base,
     };
+}
 
-    const axes: PcpAxis[] = [
-        industryAxis,
-        ...CLUSTERS.map((c) => scoreAxis(c.id, c.labelEn, c.labelZh, c.layer, clusterScores.get(c.id)!)),
-        scoreAxis('composite', 'Composite', '综合（簇等权）', 'L2-L5', composite),
-        rawAxis('s_mcap', 'Market cap', '市值（对数）', 'L6', 'log', 'usdM', mcap, { verified: true }),
-        ...SCORE_DEFS.map((d) => scoreAxis(d.id, d.labelEn, d.labelZh, d.layer, scores.get(d.id)!, { higherIs: d.higherIs, approx: d.approx, rawFormat: d.format })),
-        rawAxis('p_beta', 'Beta', 'Beta', 'L5', 'linear', 'ratio', beta),
+// Outcomes get headroom and always include zero, so up and down are visible at a glance.
+function outcomeDomain(column: (number | null)[]): [number, number] {
+    const [lo, hi] = domainFromValues('linear', column);
+    const a = Math.min(lo, 0);
+    const b = Math.max(hi, 0);
+    const pad = (b - a || 1) * 0.08;
+    return [a - pad, b + pad];
+}
+
+export function buildExplainView(stocks: StockFactorRaw[], selected: string[], asOf: Date): ExplainView {
+    const readable = (s: StockFactorRaw) =>
+        SCORED.some((d) => d.read(s) !== null) || [s.changePct, s.metric['1MonthPriceReturnDaily'], s.metric['13WeekPriceReturnDaily'], s.marketCap].some((v) => fin(v) !== null);
+    const kept = stocks.filter(readable);
+    const skipped = selected.filter((sym) => !kept.some((s) => s.symbol === sym));
+    // Selected stocks first, in the user's order; peers after.
+    const rows = [
+        ...selected.map((sym) => kept.find((s) => s.symbol === sym)).filter((s): s is StockFactorRaw => !!s),
+        ...kept.filter((s) => !selected.includes(s.symbol)),
     ];
 
-    const columns: Record<string, CellValue[]> = { industry, composite, s_mcap: mcap, p_beta: beta };
-    for (const c of CLUSTERS) columns[c.id] = clusterScores.get(c.id)!;
+    const columns: Record<string, CellValue[]> = {};
     const raw: Record<string, CellValue[]> = {};
-    for (const d of SCORE_DEFS) {
-        columns[d.id] = scores.get(d.id)!;
-        raw[d.id] = raws.get(d.id)!;
+    const axes = new Map<string, PcpAxis>();
+
+    for (const d of SCORED) {
+        const readings = rows.map(d.read);
+        raw[d.id] = readings;
+        columns[d.id] = percentileScores(readings);
+        axes.set(d.id, axisFrom({ id: d.id, labelEn: d.labelEn, labelZh: d.labelZh, section: d.section, role: 'feature', kind: 'linear', format: 'score', rawFormat: d.rawFormat, isScore: true, approx: d.approx }, columns[d.id]));
     }
 
+    const beta = rows.map((r) => fin(r.metric.beta));
+    columns.p_beta = beta;
+    axes.set('p_beta', axisFrom({ id: 'p_beta', labelEn: 'Beta (risk)', labelZh: 'Beta', section: 'Momentum', role: 'feature', kind: 'linear', format: 'ratio', domain: domainFromValues('linear', beta) }, beta));
+
+    const mcap = rows.map((r) => (fin(r.marketCap) !== null && r.marketCap! > 0 ? r.marketCap : null));
+    columns.s_mcap = mcap;
+    axes.set('s_mcap', axisFrom({ id: 's_mcap', labelEn: 'Market cap', labelZh: '市值（对数）', section: 'Size & liquidity', role: 'feature', kind: 'log', format: 'usdM', domain: domainFromValues('log', mcap), verified: true }, mcap));
+
+    // 10-day average volume x price. Finnhub's volume unit is unverified; if it is in millions of shares this is USD millions.
+    const dvol = rows.map((r) => { const v = fin(r.metric['10DayAverageTradingVolume']); const p = fin(r.price); return v !== null && p !== null && v > 0 && p > 0 ? v * p : null; });
+    columns.s_dvol = dvol;
+    axes.set('s_dvol', axisFrom({ id: 's_dvol', labelEn: 'Avg. dollar volume', labelZh: '日均成交额（对数）', section: 'Size & liquidity', role: 'feature', kind: 'log', format: 'usdM', domain: domainFromValues('log', dvol), approx: 'Volume unit unverified' }, dvol));
+
+    const analyst = rows.map((r) => fin(r.recommendation));
+    columns.x_analyst = analyst;
+    axes.set('x_analyst', axisFrom({ id: 'x_analyst', labelEn: 'Analyst consensus', labelZh: '分析师共识（1 卖 — 5 买）', section: 'Sentiment', role: 'feature', kind: 'linear', format: 'ratio', domain: [1, 5] }, analyst));
+
+    const retro = new Map<Planet, boolean>();
+    const rulers = rows.map((r) => rulerForIndustry(r.industry));
+    columns.a_ruler = rulers;
+    columns.a_ruler_retro = rulers.map((p) => {
+        if (!p) return null;
+        if (!retro.has(p)) retro.set(p, isRetrograde(p, asOf));
+        return retro.get(p) ? 'Retrograde' : 'Direct';
+    });
+    const astroBase = { section: 'Symbolic layer', role: 'astro' as AxisRole, kind: 'categorical' as const, format: 'num' as const, verified: true, approx: 'Traditional correspondence, not evidence' };
+    axes.set('a_ruler', axisFrom({ ...astroBase, id: 'a_ruler', labelEn: 'Ruling planet', labelZh: '板块守护星（传统对应）' }, columns.a_ruler));
+    axes.set('a_ruler_retro', axisFrom({ ...astroBase, id: 'a_ruler_retro', labelEn: 'Ruler motion', labelZh: '守护星顺逆行' }, columns.a_ruler_retro));
+
+    const outcomes: [string, string, string, (r: StockFactorRaw) => number | null, boolean][] = [
+        ['r_today', 'Price today', '今日涨跌（现价 vs 前收）', (r) => fin(r.changePct), true],
+        ['r_1m', 'Price 1 month', '过去 1 月涨跌', (r) => fin(r.metric['1MonthPriceReturnDaily']), false],
+        ['r_1q', 'Price 1 quarter', '过去 1 季涨跌（13 周）', (r) => fin(r.metric['13WeekPriceReturnDaily']), false],
+    ];
+    const rank: Record<string, (number | null)[]> = {};
+    for (const [id, en, zh, read, verified] of outcomes) {
+        const values = rows.map(read);
+        columns[id] = values;
+        rank[id] = percentileScores(values);
+        axes.set(id, axisFrom({ id, labelEn: en, labelZh: zh, section: 'Price outcome', role: 'outcome', kind: 'linear', format: 'spct', domain: outcomeDomain(values), verified }, values));
+    }
+
+    // The mean percentile of the scored features is only used to order the extremes in the summary, never drawn.
+    void meanOfAvailable;
+
     return {
-        axes,
+        axes: AXIS_ORDER.map((id) => axes.get(id)!),
         skipped,
+        astro: { asOf: asOf.toISOString(), moon: moonState(asOf), retrograde: retrogradePlanets(asOf) },
         table: {
             ids: rows.map((r) => r.symbol),
             labels: rows.map((r) => r.name || r.symbol),
-            group: industry,
+            group: rows.map((r) => r.industry?.trim() || null),
             columns,
             raw,
-            flags: rows.map((_, i) => ({ lowCoverage: SCORE_DEFS.filter((d) => scores.get(d.id)![i] !== null).length / SCORE_DEFS.length < 0.5 })),
+            rank,
+            selectedIndex: rows.map((r) => { const i = selected.indexOf(r.symbol); return i < 0 ? null : i; }),
         },
     };
 }
