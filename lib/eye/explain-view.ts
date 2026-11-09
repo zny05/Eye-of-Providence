@@ -63,12 +63,7 @@ interface ScoredDef {
  * free does not return; r_1m now reads monthToDatePriceReturnDaily instead.
  */
 const SCORED: ScoredDef[] = [
-    // Earnings yield (E/P) so that "right = cheaper" and a loss-making firm does not break the axis.
-    { id: 'v_ey', section: 'Value', labelEn: 'Earnings yield (E/P)', labelZh: '盈利收益率', rawFormat: 'pct', read: (r) => { const pe = fin(r.metric.peTTM); return pe === null || pe === 0 ? null : 100 / pe; }, appliesTo: 'stock' },
-    { id: 'g_rev_yoy', section: 'Growth', labelEn: 'Revenue growth', labelZh: '营收同比增速', rawFormat: 'pct', read: (r) => fin(r.metric.revenueGrowthTTMYoy), appliesTo: 'stock' },
-    { id: 'g_eps_yoy', section: 'Growth', labelEn: 'EPS growth', labelZh: 'EPS 同比增速', rawFormat: 'pct', read: (r) => fin(r.metric.epsGrowthTTMYoy), appliesTo: 'stock' },
-    { id: 'q_roe', section: 'Quality', labelEn: 'ROE', labelZh: '净资产收益率', rawFormat: 'pct', read: (r) => fin(r.metric.roeTTM), appliesTo: 'stock' },
-    { id: 'q_gm', section: 'Quality', labelEn: 'Gross margin', labelZh: '毛利率', rawFormat: 'pct', read: (r) => fin(r.metric.grossMarginTTM), appliesTo: 'stock' },
+    // --- Price momentum (universal: works for stocks and ETFs alike) ---
     {
         id: 'p_52w_pos', section: 'Momentum', labelEn: '52-week range position', labelZh: '52 周区间位置', rawFormat: 'pct',
         read: (r) => {
@@ -81,12 +76,34 @@ const SCORED: ScoredDef[] = [
     },
     // 26 weeks, not 13: the 13-week return is an outcome axis, and one number must not be both cause and effect.
     { id: 'p_6m', section: 'Momentum', labelEn: '26-week return', labelZh: '近 6 月涨幅', rawFormat: 'spct', read: (r) => fin(r.metric['26WeekPriceReturnDaily']), appliesTo: 'universal' },
+    { id: 'p_1y', section: 'Momentum', labelEn: '52-week return', labelZh: '近 1 年涨幅', rawFormat: 'spct', read: (r) => fin(r.metric['52WeekPriceReturnDaily']), appliesTo: 'universal' },
+    { id: 'p_5d', section: 'Momentum', labelEn: '5-day return', labelZh: '近 5 日涨幅', rawFormat: 'spct', read: (r) => fin(r.metric['5DayPriceReturnDaily']), appliesTo: 'universal' },
+    { id: 'p_mtd', section: 'Momentum', labelEn: 'Month-to-date return', labelZh: '本月以来涨跌 (MTD)', rawFormat: 'spct', read: (r) => fin(r.metric['monthToDatePriceReturnDaily']), appliesTo: 'universal' },
+    { id: 'p_3m', section: 'Momentum', labelEn: '3-month return', labelZh: '近 3 月涨幅', rawFormat: 'spct', read: (r) => fin(r.metric['3MonthPriceReturnDaily']), appliesTo: 'universal' },
+    { id: 'p_ytd', section: 'Momentum', labelEn: 'Year-to-date return', labelZh: '本年以来涨跌 (YTD)', rawFormat: 'spct', read: (r) => fin(r.metric['yearToDatePriceReturnDaily']), appliesTo: 'universal' },
+    // --- Value / yields ---
+    // Earnings yield (E/P) so that "right = cheaper" and a loss-making firm does not break the axis.
+    { id: 'v_ey', section: 'Value', labelEn: 'Earnings yield (E/P)', labelZh: '盈利收益率', rawFormat: 'pct', read: (r) => { const pe = fin(r.metric.peTTM); return pe === null || pe === 0 ? null : 100 / pe; }, appliesTo: 'stock' },
     { id: 'v_pb', section: 'Value', labelEn: 'Book yield (B/P)', labelZh: '市净率倒数', rawFormat: 'pct', read: (r) => { const pb = fin(r.metric.pbQuarterly) ?? fin(r.metric.pbAnnual); return pb !== null && pb > 0 ? 100 / pb : null; }, appliesTo: 'stock' },
     { id: 'v_ps', section: 'Value', labelEn: 'Sales yield (S/P)', labelZh: '市销率倒数', rawFormat: 'pct', read: (r) => { const ps = fin(r.metric.psTTM); return ps !== null && ps > 0 ? 100 / ps : null; }, appliesTo: 'stock' },
-    { id: 'v_dy', section: 'Value', labelEn: 'Dividend yield', labelZh: '股息率', rawFormat: 'pct', read: (r) => fin(r.metric.dividendYieldIndicatedAnnual), appliesTo: 'universal' },
-    { id: 'q_nm', section: 'Quality', labelEn: 'Net margin', labelZh: '净利率', rawFormat: 'pct', read: (r) => fin(r.metric.netProfitMarginTTM), appliesTo: 'stock' },
+    { id: 'v_dy', section: 'Value', labelEn: 'Dividend yield (indicated)', labelZh: '指示股息率', rawFormat: 'pct', read: (r) => fin(r.metric.dividendYieldIndicatedAnnual), appliesTo: 'universal' },
+    // --- Growth ---
+    { id: 'g_rev_yoy', section: 'Growth', labelEn: 'Revenue growth', labelZh: '营收同比增速', rawFormat: 'pct', read: (r) => fin(r.metric.revenueGrowthTTMYoy), appliesTo: 'stock' },
+    { id: 'g_eps_yoy', section: 'Growth', labelEn: 'EPS growth', labelZh: 'EPS 同比增速', rawFormat: 'pct', read: (r) => fin(r.metric.epsGrowthTTMYoy), appliesTo: 'stock' },
+    // --- Profitability (all stock-only beyond the universal yield) ---
+    { id: 'q_roe', section: 'Profitability', labelEn: 'Return on equity (ROE)', labelZh: '净资产收益率 (ROE)', rawFormat: 'pct', read: (r) => fin(r.metric.roeTTM), appliesTo: 'stock' },
+    { id: 'q_roa', section: 'Profitability', labelEn: 'Return on assets (ROA)', labelZh: '总资产收益率 (ROA)', rawFormat: 'pct', read: (r) => fin(r.metric.roaTTM), appliesTo: 'stock' },
+    { id: 'q_roi', section: 'Profitability', labelEn: 'Return on invested capital', labelZh: '投入资本收益率', rawFormat: 'pct', read: (r) => fin(r.metric.roiTTM), appliesTo: 'stock' },
+    { id: 'q_gm', section: 'Profitability', labelEn: 'Gross margin', labelZh: '毛利率', rawFormat: 'pct', read: (r) => fin(r.metric.grossMarginTTM), appliesTo: 'stock' },
+    { id: 'q_om', section: 'Profitability', labelEn: 'Operating margin', labelZh: '营业利润率', rawFormat: 'pct', read: (r) => fin(r.metric.operatingMarginTTM), appliesTo: 'stock' },
+    { id: 'q_pm', section: 'Profitability', labelEn: 'Pretax margin', labelZh: '税前净利率', rawFormat: 'pct', read: (r) => fin(r.metric.pretaxMarginTTM), appliesTo: 'stock' },
+    { id: 'q_nm', section: 'Profitability', labelEn: 'Net margin', labelZh: '净利率', rawFormat: 'pct', read: (r) => fin(r.metric.netProfitMarginTTM), appliesTo: 'stock' },
+    // --- Quality / leverage ---
     { id: 'q_lev', section: 'Quality', labelEn: 'Debt / equity (lower is better)', labelZh: '负债权益比', rawFormat: 'ratio', lowerIsBetter: true, read: (r) => fin(r.metric['totalDebt/totalEquityQuarterly']), appliesTo: 'stock' },
-    { id: 'p_1y', section: 'Momentum', labelEn: '52-week return', labelZh: '近 1 年涨幅', rawFormat: 'spct', read: (r) => fin(r.metric['52WeekPriceReturnDaily']), appliesTo: 'universal' },
+    // --- Dividends (universal: ETFs have yields too) ---
+    { id: 'd_payout', section: 'Dividends', labelEn: 'Dividend payout ratio', labelZh: '股息支付率', rawFormat: 'pct', read: (r) => fin(r.metric.dividendPayoutRatioTTM), appliesTo: 'universal' },
+    // --- Size / liquidity (handled as raw axes in buildExplainView below) ---
+    // s_mcap / s_dvol / p_beta / x_analyst live on as dedicated raw axes there.
 ];
 
 // Sentiment (Adanos, Mongo-only). Never fetched live from /eye: Adanos free is
@@ -131,11 +148,9 @@ export const DEFAULT_AXIS_IDS = [
     'a_ruler', 'a_ruler_retro', 'r_today', 'r_1m', 'r_1q',
 ];
 
-// Every axis the user can pick from. New astro dimensions slot in here.
-// Symbolic layer (astro, never scored) — 5 pre-existing + 7 new:
-//   a_ruler, a_ruler_retro, a_moon_phase, a_sun_sign, a_ruler_sign, a_ruler_decl,
-//   a_ruler_speed / a_next_event_days / a_event_count_7d
-// The 7 new ids are placed after the existing catalog extras so old URLs stay valid.
+// Every axis the user can pick from. New price/return ids slot in here after
+// the original catalog so old URLs stay valid. Symbolic layer (astro, never
+// scored) — a_ruler, a_ruler_retro + the 7 extended ids below.
 export const AXIS_CATALOG_IDS = [
     ...DEFAULT_AXIS_IDS,
     'v_pb', 'v_ps', 'v_dy', 'q_nm', 'q_lev', 'p_1y',
@@ -143,6 +158,8 @@ export const AXIS_CATALOG_IDS = [
     // Sentiment (Adanos, Mongo-only): x_sent_loc is the composite of the three
     // below — place it first so the catalog groups read top-down.
     'x_sent_loc', 'x_sent_buzz', 'x_sent_bull', 'x_sent_cov',
+    // Expanded price / profitability / dividend axes (MongoDB, see FACTOR_METRIC_KEYS).
+    'p_5d', 'p_mtd', 'p_3m', 'p_ytd', 'q_roa', 'q_roi', 'q_om', 'q_pm', 'd_payout',
 ];
 
 /**
@@ -157,7 +174,10 @@ export const DEFAULT_ETF_AXIS_IDS = [
 ];
 
 /** Axis ids whose values only make sense for one instrument type (stock vs ETF). */
-export const STOCK_ONLY_AXIS_IDS = new Set(['v_ey', 'g_rev_yoy', 'g_eps_yoy', 'q_roe', 'q_gm', 'v_pb', 'v_ps', 'q_nm', 'q_lev', 'x_analyst']);
+export const STOCK_ONLY_AXIS_IDS = new Set([
+    'v_ey', 'g_rev_yoy', 'g_eps_yoy', 'q_roe', 'q_roa', 'q_roi', 'q_gm', 'q_om', 'q_pm', 'q_nm', 'q_lev',
+    'v_pb', 'v_ps', 'x_analyst',
+]);
 export const ETF_ONLY_AXIS_IDS = new Set<string>([]); // populated after capture; see Step 1 gate in plan
 
 export const OUTCOME_AXIS_IDS = ['r_today', 'r_1m', 'r_1q'] as const;

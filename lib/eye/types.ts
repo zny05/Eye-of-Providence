@@ -55,27 +55,49 @@ export interface PcpTable {
 }
 
 // Raw Finnhub readings for one stock; field names follow `stock/metric?metric=all` and are unverified.
+// Price-related keys first (in the order the user asked for them), then yield / size /
+// profitability / efficiency / dividends. The string keys (52WeekHighDate etc.) are
+// stored in the Mongo snapshot too but only the numeric ones are typed as FactorMetricKey.
+// MongoDB persistence: getStockFactorMetrics reads FinnhubMetricSnapshot first (DB-first,
+// 12h TTL); this list is the set read out of that snapshot into each StockFactorRaw.metric.
 export const FACTOR_METRIC_KEYS = [
+    // Price returns (daily, percent)
+    '5DayPriceReturnDaily',
+    '13WeekPriceReturnDaily',
+    '26WeekPriceReturnDaily',
+    '52WeekPriceReturnDaily',
+    '3MonthPriceReturnDaily',
+    'monthToDatePriceReturnDaily',
+    'yearToDatePriceReturnDaily',
+    // 52-week range
+    '52WeekHigh',
+    '52WeekLow',
+    // Size / liquidity / risk
+    'marketCapitalization',
+    'sharesOutstanding',
+    '10DayAverageTradingVolume',
+    'beta',
+    // Valuation / yields
     'peTTM',
     'pbQuarterly',
     'pbAnnual',
     'psTTM',
     'dividendYieldIndicatedAnnual',
+    // Growth
     'revenueGrowthTTMYoy',
     'epsGrowthTTMYoy',
+    // Quality / profitability
     'roeTTM',
     'grossMarginTTM',
     'netProfitMarginTTM',
+    'operatingMarginTTM',
+    'pretaxMarginTTM',
     'totalDebt/totalEquityQuarterly',
-    'marketCapitalization',
-    '26WeekPriceReturnDaily',
-    '13WeekPriceReturnDaily',
-    '52WeekPriceReturnDaily',
-    'monthToDatePriceReturnDaily',
-    '52WeekHigh',
-    '52WeekLow',
-    'beta',
-    '10DayAverageTradingVolume',
+    // Efficiency
+    'roaTTM',
+    'roiTTM',
+    // Dividends
+    'dividendPayoutRatioTTM',
 ] as const;
 
 export type FactorMetricKey = (typeof FACTOR_METRIC_KEYS)[number];

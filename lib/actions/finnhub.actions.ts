@@ -349,7 +349,9 @@ export async function getStockMetrics(symbol: string): Promise<number | null> {
 
 // Same URL and TTL as getStockMetrics, so both share one cached response and one Finnhub request.
 // DB-first (FinnhubMetricSnapshot, TTL 12h): steady state is a pure Mongo read; the live Finnhub
-// call only runs on miss/backfill or from the Inngest warm-up job. / DB-first：稳态只读 Mongo。
+// call only runs on miss/backfill or from the Inngest warm-up job. The Eye read of this payload
+// is the Mongo snapshot path (see getFinnhubMetricFromDb above) — never a second live call.
+// DB-first：稳态只读 Mongo。
 export async function getStockFactorMetrics(symbol: string, opts?: { forceRefresh?: boolean }): Promise<Partial<Record<FactorMetricKey, number | null>> | null> {
     if (FINNHUB_KEYS.length === 0 || !hasFinnhubQuotes(symbol)) return null;
 
