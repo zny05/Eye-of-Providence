@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Eye, Moon, Plus, RotateCcw, X } from 'lucide-react';
+import { Eye, Moon, Plus, RotateCcw, Sparkles, X } from 'lucide-react';
 import Panel from '@/components/Panel';
 import ParallelCoordinatesVertical from '@/components/eye/pcp/ParallelCoordinatesVertical';
 import type { EyeExplain } from '@/lib/actions/eye.actions';
@@ -101,6 +101,17 @@ export default function EyeWorkbench({ data }: { data: EyeExplain }) {
     }, []);
     const toggleReverse = useCallback((id: string) => setReversed((prev) => ({ ...prev, [id]: !prev[id] })), []);
 
+    // Content banner (third step): one line of transit theme from CosmyDay, when available.
+    const transitLine = useMemo(() => {
+        // The CosmyDay /events/upcoming feed does not carry narrative text, so we surface
+        // the next event's headline instead. The local moon phase + retrograde list are
+        // computed from astronomy-engine on the server and ride along in view.astro.
+        if (!view) return null;
+        const cd = view.astro.cosmyday;
+        if (cd.nextEventDays === null) return null;
+        return `Next sky event in ${cd.nextEventDays} day${cd.nextEventDays === 1 ? '' : 's'}`;
+    }, [view]);
+
     return (
         <div className={pending ? 'pointer-events-none flex flex-col gap-3 opacity-60 transition-opacity' : 'flex flex-col gap-3 transition-opacity'} aria-busy={pending}>
             <Panel title="Instruments" sub={`Pick up to ${MAX_SELECTED}. Each one becomes a coloured line through the axes you choose.`}>
@@ -149,7 +160,7 @@ export default function EyeWorkbench({ data }: { data: EyeExplain }) {
                         <Eye className="size-7 text-brand-ink" />
                         {selected.length > 0
                             ? `No readable data for ${selected.join(', ')} (Finnhub free covers US stocks only).`
-                            : 'Select an instrument to see why it moved: valuation, growth, quality, momentum, size, sentiment and the symbolic layer, ending in today\u2019s, 1-month and 1-quarter price change.'}
+                            : 'Select an instrument to see why it moved: valuation, growth, quality, momentum, size, sentiment and the symbolic layer, ending in today’s, 1-month and 1-quarter price change.'}
                         {watchlist.length > 0 && (
                             <div className="mt-2 flex flex-wrap justify-center gap-1.5">
                                 {watchlist.slice(0, MAX_SELECTED).map((w) => (
@@ -164,7 +175,11 @@ export default function EyeWorkbench({ data }: { data: EyeExplain }) {
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-dashed border-[#8b5cf6]/40 bg-[#8b5cf6]/5 px-3 py-2 text-[12px] text-muted-foreground">
                         <Moon className="size-4 text-[#c4a35a]" />
                         <span><span className="font-semibold text-foreground">Symbolic layer</span> · {view.astro.moon.name}, {Math.round(view.astro.moon.illumination * 100)}% lit</span>
+                        <span>Sun in {view.astro.sunSign} {view.astro.sunSignDegree.toFixed(0)}°</span>
+                        <span>Moon in {view.astro.moon.sign} {view.astro.moon.signDegree.toFixed(0)}°</span>
                         <span>Retrograde now: {view.astro.retrograde.length ? view.astro.retrograde.join(', ') : 'none'}</span>
+                        {transitLine && <span className="flex items-center gap-1"><Sparkles className="size-3.5 text-[#c4a35a]" /> {transitLine}</span>}
+                        {view.astro.cosmyday.error && <span className="text-faint">CosmyDay feed unavailable — event axes may be empty ({view.astro.cosmyday.error})</span>}
                         <span className="text-faint">Cultural overlay, no demonstrated effect on prices.</span>
                     </div>
 

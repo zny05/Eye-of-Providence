@@ -1,4 +1,16 @@
-import { isRetrograde, moonState, retrogradePlanets, rulerForIndustry, type MoonState, type Planet } from '@/lib/eye/astro';
+import {
+    declination,
+    eclipticLongitude,
+    isRetrograde,
+    moonState,
+    retrogradePlanets,
+    rulerForIndustry,
+    zodiacSign,
+    dailySpeed,
+    signDegree,
+    type MoonState,
+    type Planet,
+} from '@/lib/eye/astro';
 import { percentileScores } from '@/lib/eye/normalize';
 import { domainFromValues } from '@/lib/eye/pcp/geometry';
 import type { AxisReason, AxisRole, CellValue, PcpAxis, PcpTable, StockFactorRaw, ValueFormat } from '@/lib/eye/types';
@@ -19,8 +31,8 @@ interface ScoredDef {
 /**
  * Source keys verified by live capture 2026-11-07 (scripts/capture-finnhub-metric.mjs: 133 metric keys
  * returned by free `GET /stock/metric?symbol=AAPL&metric=all`). The 7 named axes are NOT a field-name
- * problem — their keys are all present. The only key that was missing was 1MonthPriceReturnDaily,
- * which free does not return; r_1m now reads monthToDatePriceReturnDaily instead.
+ * problem — their keys are all present. The only key that was missing was 1MonthPriceReturnDaily, which
+ * free does not return; r_1m now reads monthToDatePriceReturnDaily instead.
  */
 const SCORED: ScoredDef[] = [
     // Earnings yield (E/P) so that "right = cheaper" and a loss-making firm does not break the axis.
@@ -48,23 +60,48 @@ const SCORED: ScoredDef[] = [
     { id: 'p_1y', section: 'Momentum', labelEn: '52-week return', labelZh: '近 1 年涨幅', rawFormat: 'spct', read: (r) => fin(r.metric['52WeekPriceReturnDaily']) },
 ];
 
-// Suggested starting layout, in reading order from fundamentals to the price outcome. Nothing here is fixed:
-// the user can drop, add, swap and reorder axes (2 to 16).
+// Suggested starting layout — 16 axes (same cap as before). Widened astro layer:
+//   a_ruler (12) and a_ruler_retro (13) stay in place; the remaining new astro axes
+//   (a_moon_phase, a_sun_sign, a_ruler_sign, a_ruler_decl) are in the catalog below,
+//   reachable via “Add axis” without breaching the 16-cap.
 export const DEFAULT_AXIS_IDS = [
     'v_ey', 'g_rev_yoy', 'g_eps_yoy', 'q_roe', 'q_gm', 'p_52w_pos', 'p_6m', 'p_beta', 's_mcap', 's_dvol', 'x_analyst',
     'a_ruler', 'a_ruler_retro', 'r_today', 'r_1m', 'r_1q',
 ];
 
-// Every axis the user can pick from.
-export const AXIS_CATALOG_IDS = [...DEFAULT_AXIS_IDS, 'v_pb', 'v_ps', 'v_dy', 'q_nm', 'q_lev', 'p_1y'];
+// Every axis the user can pick from. New astro dimensions slot in here.
+// Symbolic layer (astro, never scored) — 5 pre-existing + 7 new:
+//   a_ruler, a_ruler_retro, a_moon_phase, a_sun_sign, a_ruler_sign, a_ruler_decl,
+//   a_ruler_speed / a_next_event_days / a_event_count_7d
+// The 7 new ids are placed after the existing catalog extras so old URLs stay valid.
+export const AXIS_CATALOG_IDS = [
+    ...DEFAULT_AXIS_IDS,
+    'v_pb', 'v_ps', 'v_dy', 'q_nm', 'q_lev', 'p_1y',
+    'a_moon_phase', 'a_sun_sign', 'a_ruler_sign', 'a_ruler_decl', 'a_ruler_speed', 'a_next_event_days', 'a_event_count_7d',
+];
 
 export const OUTCOME_AXIS_IDS = ['r_today', 'r_1m', 'r_1q'] as const;
+
+export interface CosmyDayContext {
+    nextEventDays: number | null;
+    eventCount7d: number;
+    error?: string;
+}
 
 export interface ExplainView {
     axes: PcpAxis[];
     table: PcpTable;
     skipped: string[]; // selected symbols without any readable data
-    astro: { asOf: string; moon: MoonState; retrograde: Planet[] };
+    astro: {
+        asOf: string;
+        moon: MoonState;
+        retrograde: Planet[];
+        /** Local tropical Sun/Moon signs for the banner (never part of any score). */
+        sunSign: string;
+        sunSignDegree: number;
+        /** CosmyDay feed state for a_next_event_days / a_event_count_7d (null = no remote source). */
+        cosmyday: CosmyDayContext;
+    };
 }
 
 function axisFrom(base: Pick<PcpAxis, 'id' | 'labelEn' | 'labelZh' | 'section' | 'role' | 'kind' | 'format'> & Partial<PcpAxis>, column: CellValue[], reason: AxisReason = 'ok'): PcpAxis {
@@ -82,6 +119,11 @@ function reasonFor(values: (number | null)[], fetchHadError: boolean): AxisReaso
     return fetchHadError ? 'fetch-failed' : 'no-data';
 }
 
+function reasonForCells(values: (CellValue | null)[], fetchHadError: boolean): AxisReason {
+    if (values.some((v) => v !== null)) return 'ok';
+    return fetchHadError ? 'fetch-failed' : 'no-data';
+}
+
 // Outcomes get headroom and always include zero, so up and down are visible at a glance.
 function outcomeDomain(column: (number | null)[]): [number, number] {
     const [lo, hi] = domainFromValues('linear', column);
@@ -91,7 +133,21 @@ function outcomeDomain(column: (number | null)[]): [number, number] {
     return [a - pad, b + pad];
 }
 
-export function buildExplainView(stocks: StockFactorRaw[], selected: string[], asOf: Date): ExplainView {
+// Expand a declination/equatorial domain to include the Sun's seasonal extremes when useful.
+function degDomain(values: (number | null)[]): [number, number] {
+    const sorted = values.filter((v): v is number => v !== null && Number.isFinite(v)).sort((a, b) => a - b);
+    if (sorted.length === 0) return [-23.5, 23.5];
+    const lo = Math.min(-23.5, sorted[0] - 1);
+    const hi = Math.max(23.5, sorted[sorted.length - 1] + 1);
+    return [lo, hi];
+}
+
+export function buildExplainView(
+    stocks: StockFactorRaw[],
+    selected: string[],
+    asOf: Date,
+    cosmyday?: CosmyDayContext,
+): ExplainView {
     const readable = (s: StockFactorRaw) =>
         SCORED.some((d) => d.read(s) !== null) || [s.changePct, s.metric['monthToDatePriceReturnDaily'], s.metric['13WeekPriceReturnDaily'], s.marketCap].some((v) => fin(v) !== null);
     const kept = stocks.filter(readable);
@@ -135,6 +191,10 @@ export function buildExplainView(stocks: StockFactorRaw[], selected: string[], a
     columns.x_analyst = analyst;
     axes.set('x_analyst', axisFrom({ id: 'x_analyst', labelEn: 'Analyst consensus', labelZh: '分析师共识（1 卖 — 5 买）', section: 'Sentiment', role: 'feature', kind: 'linear', format: 'ratio', domain: [1, 5], verified: true }, analyst, reasonFor(analyst, false)));
 
+    // ---------------------------------------------------------------------------
+    // Symbolic layer (astro, never scored, never weighted). All values are computed
+    // locally; only a_next_event_days / a_event_count_7d touch the CosmyDay feed.
+    // ---------------------------------------------------------------------------
     const retro = new Map<Planet, boolean>();
     const rulers = rows.map((r) => rulerForIndustry(r.industry));
     columns.a_ruler = rulers;
@@ -146,6 +206,76 @@ export function buildExplainView(stocks: StockFactorRaw[], selected: string[], a
     const astroBase = { section: 'Symbolic layer', role: 'astro' as AxisRole, kind: 'categorical' as const, format: 'num' as const, verified: true, approx: 'Traditional correspondence, not evidence' };
     axes.set('a_ruler', axisFrom({ ...astroBase, id: 'a_ruler', labelEn: 'Ruling planet', labelZh: '板块守护星（传统对应）' }, columns.a_ruler));
     axes.set('a_ruler_retro', axisFrom({ ...astroBase, id: 'a_ruler_retro', labelEn: 'Ruler motion', labelZh: '守护星顺逆行' }, columns.a_ruler_retro));
+
+    // Sun / Moon dimensions (date-derived — every row shows the same value, the axis is a
+    // "what is today's sky" marker so users can sort/compare against fundamentals).
+    const moon = moonState(asOf);
+    const sunLon = eclipticLongitude('Sun', asOf);
+    const sunSign = zodiacSign(sunLon);
+    const sunDeg = signDegree(sunLon);
+
+    const moonPhaseCol = rows.map(() => moon.phaseAngle);
+    columns.a_moon_phase = moonPhaseCol;
+    axes.set(
+        'a_moon_phase',
+        axisFrom({ ...astroBase, id: 'a_moon_phase', labelEn: 'Moon phase angle (0–360°)', labelZh: '月相角（0–360°）', kind: 'linear', format: 'num', domain: [0, 360], approx: `Moon: ${moon.name}, ${Math.round(moon.illumination * 100)}% lit` }, moonPhaseCol, reasonFor(moonPhaseCol, false)),
+    );
+
+    const sunSignCol = rows.map(() => sunSign);
+    columns.a_sun_sign = sunSignCol;
+    axes.set(
+        'a_sun_sign',
+        axisFrom({ ...astroBase, id: 'a_sun_sign', labelEn: 'Sun sign (tropical)', labelZh: '日元星座（回归黄道）', approx: `Sun in ${sunSign} at ${sunDeg.toFixed(1)}°` }, sunSignCol, reasonForCells(sunSignCol, false)),
+    );
+
+    // Ruler-derived dimensions (one per row — hence a real differentiation axis).
+    const rulerSigns = rulers.map((p) => (p ? zodiacSign(eclipticLongitude(p, asOf)) : null));
+    columns.a_ruler_sign = rulerSigns;
+    axes.set(
+        'a_ruler_sign',
+        axisFrom({ ...astroBase, id: 'a_ruler_sign', labelEn: 'Ruler sign', labelZh: '守护星星座', approx: 'Tropical, Swiss-Ephemeris compatible' }, rulerSigns, reasonForCells(rulerSigns, false)),
+    );
+
+    const rulerDecls = rulers.map((p) => (p ? declination(p, asOf) : null));
+    columns.a_ruler_decl = rulerDecls;
+    axes.set(
+        'a_ruler_decl',
+        axisFrom({ ...astroBase, id: 'a_ruler_decl', labelEn: 'Ruler declination (°)', labelZh: '守护星赤纬（°）', kind: 'linear', format: 'num', domain: degDomain(rulerDecls), approx: 'Geocentric declination, −23.5° ~ +23.5° seasonal band' }, rulerDecls, reasonFor(rulerDecls, false)),
+    );
+
+    const rulerSpeeds = rulers.map((p) => (p ? dailySpeed(p, asOf) : null));
+    columns.a_ruler_speed = rulerSpeeds;
+    axes.set(
+        'a_ruler_speed',
+        axisFrom({ ...astroBase, id: 'a_ruler_speed', labelEn: 'Ruler speed (°/day)', labelZh: '守护星黄经速度（°/日）', kind: 'linear', format: 'num', domain: domainFromValues('linear', rulerSpeeds), approx: 'Negative = retrograde' }, rulerSpeeds, reasonFor(rulerSpeeds, false)),
+    );
+
+    // CosmyDay-derived: whole-universe markers (the feed is date-based, not per-symbol).
+    const cd = cosmyday ?? { nextEventDays: null, eventCount7d: 0 };
+    const nextEvent = rows.map(() => cd.nextEventDays);
+    columns.a_next_event_days = nextEvent;
+    axes.set(
+        'a_next_event_days',
+        axisFrom(
+            { ...astroBase, id: 'a_next_event_days', labelEn: 'Days to next sky event', labelZh: '下个天象日（天）', kind: 'linear', format: 'num', domain: [0, 30], approx: cd.error ? `CosmyDay feed unavailable (${cd.error})` : 'CosmyDay /events/upcoming, importance ≥60' },
+            nextEvent,
+            // When there is no feed the axis is "no-data", not "fetch-failed" — the user just
+            // hasn't warmed it yet. cosmyday.ts surfaces the underlying error via ExplainView.astro.
+            reasonFor(nextEvent, false),
+        ),
+    );
+
+    const count7 = rows.map(() => cd.eventCount7d);
+    columns.a_event_count_7d = count7;
+    axes.set(
+        'a_event_count_7d',
+        axisFrom(
+            { ...astroBase, id: 'a_event_count_7d', labelEn: 'Sky events in next 7 days', labelZh: '未来 7 天天象数', kind: 'linear', format: 'num', domain: [0, 10], approx: 'CosmyDay /events/upcoming, importance ≥60' },
+            count7,
+            // 0 is a valid reading when the feed responds, so treat non-null as ok.
+            cd.nextEventDays === null && cd.eventCount7d === 0 && cd.error ? 'fetch-failed' : 'ok',
+        ),
+    );
 
     // Finnhub free does not return 1MonthPriceReturnDaily (capture 2026-11-07); use month-to-date instead.
     // Finnhub free 不返回 1MonthPriceReturnDaily（2026-11-07 捕获确认）；用 monthToDatePriceReturnDaily 代替。
@@ -165,7 +295,14 @@ export function buildExplainView(stocks: StockFactorRaw[], selected: string[], a
     return {
         axes: AXIS_CATALOG_IDS.map((id) => axes.get(id)!),
         skipped,
-        astro: { asOf: asOf.toISOString(), moon: moonState(asOf), retrograde: retrogradePlanets(asOf) },
+        astro: {
+            asOf: asOf.toISOString(),
+            moon,
+            retrograde: retrogradePlanets(asOf),
+            sunSign,
+            sunSignDegree: sunDeg,
+            cosmyday: cd,
+        },
         table: {
             ids: rows.map((r) => r.symbol),
             labels: rows.map((r) => r.name || r.symbol),

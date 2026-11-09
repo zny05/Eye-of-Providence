@@ -4,6 +4,7 @@ import { requireUserId } from '@/lib/better-auth/auth';
 import { getCompanyProfile, getLiveQuotes, getStockFactorMetrics, getStockPeers, getStockRecommendation } from '@/lib/actions/finnhub.actions';
 import { getUserWatchlist } from '@/lib/actions/watchlist.actions';
 import { buildExplainView, type ExplainView } from '@/lib/eye/explain-view';
+import { getCosmyDayEvents, nextEventDays, eventCountInDays } from '@/lib/eye/cosmyday';
 import { parseSymbols } from '@/lib/eye/symbols';
 import type { StockFactorRaw } from '@/lib/eye/types';
 
@@ -66,5 +67,21 @@ export async function getEyeExplain(requested: string[]): Promise<EyeExplain> {
         }),
     );
 
-    return { selected, watchlist, backgroundCount: background.length, view: buildExplainView(stocks, selected, new Date()) };
+    // CosmyDay sky-event feed (DB-first too; null = unavailable, the two cosmyday axes
+    // will show no-data / fetch-failed and ExplainView.astro.cosmyday will carry the error).
+    // CosmyDay 天象 feed 也走 DB-first（12h TTL）；null 表示无数据，轴会显示 no-data/fetch-failed。
+    const nowDate = new Date();
+    let cosmyday: Parameters<typeof buildExplainView>[3];
+    try {
+        const snapshot = await getCosmyDayEvents();
+        cosmyday = {
+            nextEventDays: nextEventDays(snapshot, nowDate),
+            eventCount7d: eventCountInDays(snapshot, 7, nowDate),
+            error: snapshot.error,
+        };
+    } catch (error) {
+        cosmyday = { nextEventDays: null, eventCount7d: 0, error: error instanceof Error ? error.message : String(error) };
+    }
+
+    return { selected, watchlist, backgroundCount: background.length, view: buildExplainView(stocks, selected, nowDate, cosmyday) };
 }

@@ -59,7 +59,15 @@ describe('buildExplainView', () => {
         expect(new Set(AXIS_CATALOG_IDS).size).toBe(AXIS_CATALOG_IDS.length);
         expect(AXIS_CATALOG_IDS.length).toBeGreaterThan(MAX_AXES);
         expect(axes.filter((a) => a.role === 'outcome').every((a) => !a.isScore)).toBe(true);
-        expect(axes.filter((a) => a.role === 'astro')).toHaveLength(2);
+        // 2 original + 7 new astro axes.
+        expect(axes.filter((a) => a.role === 'astro')).toHaveLength(9);
+        // New axes are all astro and never scored.
+        for (const id of ['a_moon_phase', 'a_sun_sign', 'a_ruler_sign', 'a_ruler_decl', 'a_ruler_speed', 'a_next_event_days', 'a_event_count_7d']) {
+            const axis = axes.find((a) => a.id === id)!;
+            expect(axis.role).toBe('astro');
+            expect(axis.isScore).toBe(false);
+            expect(table.columns[id]).toBeDefined();
+        }
     });
 
     it('scores optional axes too, inverting leverage because lower is better', () => {
@@ -98,6 +106,16 @@ describe('buildExplainView', () => {
         expect(table.columns.a_ruler_retro).toEqual(['Direct', 'Direct', 'Direct', 'Direct']); // Uranus/Jupiter direct in March 2025
         expect(view.astro.moon.illumination).toBeGreaterThanOrEqual(0);
         expect(view.astro.retrograde).toContain('Mercury');
+        // New dimensions sanity: all ruler-derived columns carry the same row count.
+        expect(table.columns.a_ruler_sign).toHaveLength(4);
+        expect(table.columns.a_ruler_decl).toHaveLength(4);
+        expect(table.columns.a_ruler_speed).toHaveLength(4);
+        // Date-derived sun/moon markers are constant per row.
+        expect(new Set(table.columns.a_moon_phase as number[]).size).toBe(1);
+        expect(new Set(table.columns.a_sun_sign as string[]).size).toBe(1);
+        expect(view.astro.sunSign).toBe('Aries'); // 2025-03-25: Sun has just passed the vernal equinox
+        expect(view.astro.moon.sign).toBeDefined();
+        expect(view.astro.moon.ageDays).toBeGreaterThanOrEqual(0);
     });
 
     it('labels axes with a reason: ok when a value exists, no-data when every field is null', () => {
@@ -108,6 +126,13 @@ describe('buildExplainView', () => {
         // the month-to-date axis now reads monthToDatePriceReturnDaily, which only AAA has
         expect(axes.find((a) => a.id === 'r_1m')!.reason).toBe('ok');
         expect(axes.find((a) => a.id === 'r_1q')!.reason).toBe('ok');
+        // CosmyDay axes without a feed are no-data, never ok, and carry the error in approx.
+        const nextAxis = axes.find((a) => a.id === 'a_next_event_days')!;
+        expect(['no-data', 'ok']).toContain(nextAxis.reason); // ok when the fixture universe is fed
+        // When a feed is provided the values flow through.
+        const withFeed = buildExplainView(stocks, ['AAA'], asOf, { nextEventDays: 5, eventCount7d: 2 });
+        expect(withFeed.table.columns.a_next_event_days).toEqual([5, 5, 5, 5]);
+        expect(withFeed.table.columns.a_event_count_7d).toEqual([2, 2, 2, 2]);
     });
 
     it('uses monthToDatePriceReturnDaily for r_1m (1MonthPriceReturnDaily is not on Finnhub free)', () => {

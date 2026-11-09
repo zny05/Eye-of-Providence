@@ -7,6 +7,7 @@ import { collectAdanosSentimentForSymbol } from "@/lib/actions/adanos-collect.ac
 import { getFormattedTodayDate } from "@/lib/utils";
 import { callAIProviderWithFallback } from "@/lib/ai-provider";
 import { warmFinnhubMetricCache } from "@/lib/actions/finnhub.actions";
+import { warmCosmyDayEventsCache } from "@/lib/eye/cosmyday";
 
 export const sendSignUpEmail = inngest.createFunction(
     { id: 'sign-up-email', triggers: [{ event: 'app/user.created' }] },
@@ -589,5 +590,16 @@ export const warmFinnhubMetricCacheJob = inngest.createFunction(
             await step.sleep('pace', '1 second');
         }
         return { symbols: allSymbols.length, ok, failed };
+    }
+);
+
+// Keep the CosmyDay sky-event feed warm so /eye reads it from Mongo, not per page load.
+// CosmyDay runs on a single small server; the 12h TTL + 6h warm-up honours their fair-use ask.
+// 每 6 小时预热一次 CosmyDay 天象 feed（单服务器，12h TTL），让 /eye 只读 Mongo。
+export const warmCosmyDayEventsCacheJob = inngest.createFunction(
+    { id: 'warm-cosmyday-events-cache', concurrency: 1, triggers: [{ cron: '0 */6 * * *' }] }, // every 6 hours on the hour
+    async ({ step }) => {
+        const snapshot = await step.run('warm-cosmyday-events', async () => warmCosmyDayEventsCache());
+        return { events: snapshot.events.length, fromCache: snapshot.fromCache, error: snapshot.error ?? null };
     }
 );
