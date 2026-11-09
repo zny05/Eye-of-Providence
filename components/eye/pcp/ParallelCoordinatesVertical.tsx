@@ -195,7 +195,11 @@ export default function ParallelCoordinatesVertical({ axes, catalog, table, reve
     const pendingCursor = useRef<{ x: number; y: number } | null>(null);
     const hoverTimer = useRef<number | null>(null);
     const paintHoverTimer = useRef<number | null>(null);
-    const tipHeight = 18 + n * 18 + 32;
+    // Fixed pixel budget: p-2.5 (20px) + two header lines (32px) + dl margin (6px)
+    // + one row per axis (17px each). The previous `18 + n*18 + 32` left the header
+    // 10–16px short, so the dl started inside the header's space and the symbol
+    // name was covered by the first axis row (see screenshot 2026-11-09_114546).
+    const tipHeight = 58 + n * 17;
 
     const paintTooltip = useCallback((x: number, y: number) => {
         if (!tooltipRef.current) return;
@@ -324,11 +328,11 @@ export default function ParallelCoordinatesVertical({ axes, catalog, table, reve
                                 backfaceVisibility: 'hidden',
                             }}
                         >
-                            <p className="flex min-w-0 items-baseline gap-1.5 font-semibold text-foreground" style={{ overflow: 'hidden' }}>
+                            <p className="flex min-w-0 items-baseline gap-1.5 font-semibold text-foreground" style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}>
                                 <span className="mono flex-none">{table.ids[tipRow]}</span>
-                                <span className="min-w-0 flex-1 truncate">{table.labels[tipRow] !== table.ids[tipRow] ? table.labels[tipRow] : ''}</span>
+                                <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{table.labels[tipRow] !== table.ids[tipRow] ? table.labels[tipRow] : ''}</span>
                             </p>
-                            <p className="truncate text-faint">{table.group[tipRow] ?? 'Industry unknown'}{!tipSelected && canAdd ? ' · click to add' : ''}</p>
+                            <p className="overflow-hidden text-ellipsis whitespace-nowrap text-faint">{table.group[tipRow] ?? 'Industry unknown'}{!tipSelected && canAdd ? ' · click to add' : ''}</p>
                             <dl className="mt-1.5 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5">
                                 {axes.map((a) => {
                                     const v = table.columns[a.id]?.[tipRow];
