@@ -6,7 +6,7 @@ import { CalendarClock, Eye, Moon, Plus, RotateCcw, Sparkles, Sun, X } from 'luc
 import Panel from '@/components/Panel';
 import ParallelCoordinatesVertical from '@/components/eye/pcp/ParallelCoordinatesVertical';
 import type { EyeExplain } from '@/lib/actions/eye.actions';
-import { AXIS_CATALOG_IDS, DEFAULT_AXIS_IDS, OUTCOME_AXIS_IDS } from '@/lib/eye/explain-view';
+import { AXIS_CATALOG_IDS, DEFAULT_AXIS_IDS, STOCK_ONLY_AXIS_IDS, OUTCOME_AXIS_IDS } from '@/lib/eye/explain-view';
 import { formatValue } from '@/lib/eye/format';
 import { EYE_THEME, SELECTED_PALETTE } from '@/lib/eye/pcp/color-scale';
 import { parseSymbols, SYMBOL_PATTERN } from '@/lib/eye/symbols';
@@ -97,6 +97,13 @@ export default function EyeWorkbench({ data }: { data: EyeExplain }) {
     const full = selected.length >= MAX_SELECTED;
     const addable = watchlist.filter((w) => !selected.includes(w.symbol));
 
+    // Type-aware axis hints: when the whole selection is ETFs (or a mixed selection)
+    // we surface a hint in the add-axis dropdown so stock-only axes aren't added by
+    // accident. Axes the user already picked stay put (same chart, dashed missing
+    // lane), but a pure-ETF selection gets STOCK_ONLY axes flagged (stocks…).
+    const selectionHasEtf = view ? selected.some((s) => { const i = view.table.ids.indexOf(s); return i >= 0 && view.table.kinds?.[i] === 'etf'; }) : false;
+    const selectionHasStockLike = view ? selected.some((s) => { const i = view.table.ids.indexOf(s); return i >= 0 && view.table.kinds?.[i] !== 'etf'; }) : true;
+
     const axes = useMemo(() => {
         if (!view) return [];
         const byId = new Map(view.axes.map((a) => [a.id, a]));
@@ -140,18 +147,23 @@ export default function EyeWorkbench({ data }: { data: EyeExplain }) {
 
     return (
         <div className={pending ? 'pointer-events-none flex flex-col gap-3 opacity-60 transition-opacity' : 'flex flex-col gap-3 transition-opacity'} aria-busy={pending}>
-            <Panel title="Instruments" sub={`Pick up to ${MAX_SELECTED}. Each one becomes a coloured line through the axes you choose.`}>
+            <Panel title="Instruments" sub={`Pick up to ${MAX_SELECTED}. Each one becomes a coloured line through the axes you choose. ETFs only get price/size axes — the stock-fundamental axes show a gap for them.`}>
                 <div className="flex flex-col gap-3 p-3.5">
                     <ul className="flex flex-wrap gap-1.5" aria-label="Selected instruments">
-                        {selected.map((symbol, i) => (
-                            <li key={symbol} className="flex items-center gap-1.5 rounded-full border border-line-strong bg-hover py-0.5 pl-2 pr-1 text-[12.5px]">
-                                <span className="size-2.5 rounded-full" style={{ background: SELECTED_PALETTE[i % SELECTED_PALETTE.length] }} />
-                                <span className="mono font-semibold text-foreground">{symbol}</span>
-                                <button type="button" className="grid size-5 place-items-center rounded-full text-faint hover:bg-white/10 hover:text-foreground" aria-label={`Remove ${symbol}`} onClick={() => remove(symbol)}>
-                                    <X className="size-3" />
-                                </button>
-                            </li>
-                        ))}
+                        {selected.map((symbol, i) => {
+                            const row = view?.table.ids.indexOf(symbol) ?? -1;
+                            const isEtf = row >= 0 && view?.table.kinds?.[row] === 'etf';
+                            return (
+                                <li key={symbol} className="flex items-center gap-1.5 rounded-full border border-line-strong bg-hover py-0.5 pl-2 pr-1 text-[12.5px]">
+                                    <span className="size-2.5 rounded-full" style={{ background: SELECTED_PALETTE[i % SELECTED_PALETTE.length] }} />
+                                    <span className="mono font-semibold text-foreground">{symbol}</span>
+                                    {isEtf && <span className="rounded border border-line-strong px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-faint">ETF</span>}
+                                    <button type="button" className="grid size-5 place-items-center rounded-full text-faint hover:bg-white/10 hover:text-foreground" aria-label={`Remove ${symbol}`} onClick={() => remove(symbol)}>
+                                        <X className="size-3" />
+                                    </button>
+                                </li>
+                            );
+                        })}
                         {selected.length === 0 && <li className="text-[13px] text-faint">Nothing selected yet.</li>}
                     </ul>
 
@@ -241,7 +253,11 @@ export default function EyeWorkbench({ data }: { data: EyeExplain }) {
                                         <option value="">{axisIds.length >= MAX_AXES ? 'Axis limit reached' : 'Add axis…'}</option>
                                         {[...new Set(unusedAxes.map((a) => a.section))].map((section) => (
                                             <optgroup key={section} label={section}>
-                                                {unusedAxes.filter((a) => a.section === section).map((a) => <option key={a.id} value={a.id}>{a.labelEn}</option>)}
+                                                {unusedAxes.filter((a) => a.section === section).map((a) => {
+                                                    const stockOnly = STOCK_ONLY_AXIS_IDS.has(a.id);
+                                                    const hint = selectionHasEtf && !selectionHasStockLike && stockOnly ? ' (stocks only)' : '';
+                                                    return <option key={a.id} value={a.id}>{a.labelEn}{hint}</option>;
+                                                })}
                                             </optgroup>
                                         ))}
                                     </select>
@@ -317,6 +333,7 @@ export default function EyeWorkbench({ data }: { data: EyeExplain }) {
                     <ul className="flex flex-col gap-1 px-1 text-[11.5px] leading-snug text-faint">
                         {view.skipped.length > 0 && <li>No readable data for {view.skipped.join(', ')} (Finnhub free covers US stocks only).</li>}
                         <li>Background: {backgroundCount} grey peers, drawn only from your watchlist (at most 14). No Finnhub peer-list symbols are used. Industry is Finnhub&apos;s own classification.</li>
+                        <li>Percentiles are computed within instrument type: stocks against stocks, ETFs against ETFs. ETFs show a gap (dashed missing lane) on stock-only axes such as earnings yield, ROE or gross margin.</li>
                         <li>Axes marked &quot;unverified&quot; use Finnhub metric names or units that have not been checked against a live response; they may be empty or mis-scaled. The 1-month and 1-quarter changes are price returns, not total returns.</li>
                         <li>The macro-environment axis needs the FRED pipeline, which is not built yet.</li>
                         <li>Eye of Omniscience explains what already happened with public data. It is for research and education only, is not investment advice, and does not forecast prices. The symbolic layer is a cultural overlay with no demonstrated effect on prices.</li>

@@ -354,11 +354,14 @@ export default function ParallelCoordinatesVertical({ axes, catalog, table, reve
                                 keeps the dl from shrinking it. */}
                             <p className="flex min-w-0 flex-none items-baseline gap-2 leading-tight" style={{ whiteSpace: 'nowrap' }}>
                                 <span className="mono text-[20px] font-bold tracking-tight text-foreground">{table.ids[tipRow]}</span>
+                                {table.kinds?.[tipRow] === 'etf' && (
+                                    <span className="flex-none rounded border border-line-strong px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-faint">ETF</span>
+                                )}
                                 {table.labels[tipRow] !== table.ids[tipRow] && (
                                     <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-foreground/90">{table.labels[tipRow]}</span>
                                 )}
                             </p>
-                            <p className="mt-0.5 flex-none truncate text-[11px] leading-tight text-faint">{table.group[tipRow] ?? 'Industry unknown'}{!tipSelected && canAdd ? ' · click to add' : ''}</p>
+                            <p className="mt-0.5 flex-none truncate text-[11px] leading-tight text-faint">{table.group[tipRow] ?? (table.kinds?.[tipRow] === 'etf' ? 'Exchange-traded fund' : 'Industry unknown')}{!tipSelected && canAdd ? ' · click to add' : ''}</p>
                             <dl className="mt-1.5 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5">
                                 {axes.map((a) => {
                                     const v = table.columns[a.id]?.[tipRow];

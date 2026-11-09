@@ -4,7 +4,7 @@ import { requireUserId } from '@/lib/better-auth/auth';
 import { getCompanyProfile, getLiveQuotes, getStockFactorMetrics, getStockRecommendation } from '@/lib/actions/finnhub.actions';
 import { getStockSentimentFromDb } from '@/lib/actions/adanos.actions';
 import { getUserWatchlist } from '@/lib/actions/watchlist.actions';
-import { buildExplainView, type ExplainView } from '@/lib/eye/explain-view';
+import { buildExplainView, classifyInstrument, type ExplainView } from '@/lib/eye/explain-view';
 import { getCosmyDayEvents, getCosmyDayTransit, nextEvent, nextEventDays, eventCountInDays } from '@/lib/eye/cosmyday';
 import { parseSymbols } from '@/lib/eye/symbols';
 import type { StockFactorRaw, StockSentimentRaw } from '@/lib/eye/types';
@@ -79,16 +79,22 @@ export async function getEyeExplain(requested: string[]): Promise<EyeExplain> {
                 // scale has neighbours, but only selected symbols are guaranteed warm.
                 getSentimentForSymbol(symbol),
             ]);
+            const name = profile?.name || watchlist.find((w) => w.symbol === symbol)?.company || symbol;
+            const industry = profile?.finnhubIndustry ?? null;
+            const profileType = profile?.type ?? null;
+            const kind = classifyInstrument(symbol, profileType, name, industry);
             return {
                 symbol,
-                name: profile?.name || watchlist.find((w) => w.symbol === symbol)?.company || symbol,
-                industry: profile?.finnhubIndustry ?? null,
+                name,
+                industry,
                 marketCap: profile?.marketCapitalization ?? null,
                 price: quotes[symbol]?.c ?? null,
                 changePct: quotes[symbol]?.dp ?? null,
                 recommendation,
                 metric: metric ?? {},
                 sentiment,
+                kind,
+                profileType,
             };
         }),
     );

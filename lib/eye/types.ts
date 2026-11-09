@@ -6,6 +6,10 @@ export type CellValue = number | string | null;
 // feature = explains; outcome = the observed price result (never scored or weighted); astro = symbolic layer.
 // sentiment = Adanos multi-source sentiment aggregates (Reddit/X/News/Polymarket) — feature, scored, never weighted differently.
 export type AxisRole = 'feature' | 'outcome' | 'astro' | 'sentiment';
+/** Which instrument types an axis is meaningful for. 'universal' = both stock and ETF. */
+export type AxisKindAppliesTo = 'stock' | 'etf' | 'universal';
+/** Stock's own instrument type, for type-aware axis selection and per-kind scoring. */
+export type InstrumentKind = 'stock' | 'etf' | 'unknown';
 
 // Why an axis might be empty, so the UI can explain itself instead of rendering an ambiguous gap.
 // ok = values present; fetch-failed = the live request failed (429/403/timeout); no-data = request
@@ -30,6 +34,8 @@ export interface PcpAxis {
     approx?: string;
     /** Why the axis might be empty, so the header can explain itself. Default 'ok'. */
     reason: AxisReason;
+    /** Which instrument types this axis is meaningful for ('universal' = both). */
+    appliesTo?: AxisKindAppliesTo;
 }
 
 export interface PcpTable {
@@ -44,6 +50,8 @@ export interface PcpTable {
     rank: Record<string, (number | null)[]>;
     // Position among the user's selection (0-based), null for background peers.
     selectedIndex: (number | null)[];
+    // Instrument type per row ('stock' | 'etf' | 'unknown').
+    kinds: InstrumentKind[];
 }
 
 // Raw Finnhub readings for one stock; field names follow `stock/metric?metric=all` and are unverified.
@@ -102,6 +110,14 @@ export interface StockFactorRaw {
     metric: Partial<Record<FactorMetricKey, number | null>>;
     /** Adanos sentiment aggregates (Mongo snapshot only, never live). Optional for peers. */
     sentiment?: StockSentimentRaw | null;
+    /** Stock vs ETF vs unclassified — drives type-aware axis selection and per-kind scoring. */
+    kind: InstrumentKind;
+    /**
+     * Finnhub `profile2.type` when present (e.g. 'common_stock', 'unit', …). The API has
+     * no reliable "etf" value, so classification leans on the curated ETF list and
+     * profile fallbacks; this field keeps the raw signal for logging/debugging.
+     */
+    profileType?: string | null;
 }
 
 export const MAX_SELECTED = 12;

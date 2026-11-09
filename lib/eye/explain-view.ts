@@ -13,9 +13,36 @@ import {
 } from '@/lib/eye/astro';
 import { percentileScores } from '@/lib/eye/normalize';
 import { domainFromValues } from '@/lib/eye/pcp/geometry';
-import type { AxisReason, AxisRole, CellValue, PcpAxis, PcpTable, StockFactorRaw, ValueFormat } from '@/lib/eye/types';
+import type { AxisKindAppliesTo, AxisReason, AxisRole, CellValue, InstrumentKind, PcpAxis, PcpTable, StockFactorRaw, ValueFormat } from '@/lib/eye/types';
 
 const fin = (v: number | null | undefined): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+// A curated set of common US equity ETF tickers. Finnhub profile2 has no reliable
+// "etf" discriminator, so classification leans on this explicit list (plus a
+// name/industry fallback in lib/actions/eye.actions.ts) — never a fuzzy regex,
+// to keep false positives out of the ETF percentile universe.
+const KNOWN_ETFS = new Set([
+    'SPY', 'VOO', 'IVV', 'QQQ', 'DIA', 'IWM', 'EEM', 'AGG', 'TLT', 'GLD', 'SLV', 'USO',
+    'XLE', 'XLF', 'XLK', 'XLV', 'XLP', 'XLI', 'XLU', 'XLB', 'XLRE', 'XLC', 'XLY', 'XAP',
+    'ARKK', 'VEA', 'VWO', 'IJH', 'IJR', 'ITOT', 'SCHX', 'SCHD', 'VTI', 'VB', 'VNQ',
+    'VYM', 'SCHF', 'SCHG', 'SCHA', 'QUAL', 'MINT', 'JEPI', 'JEPQ', 'SCHP', 'VTIP',
+    'BND', 'BNDX', 'VGSH', 'VGLT', 'VCIT', 'VCSH', 'EFA', 'EWZ', 'EWU', 'EWJ', 'FXI',
+]);
+
+/** Classify a symbol as an ETF (or stock/unknown) from name/industry/symbol signals. */
+export function classifyInstrument(symbol: string, profileType: string | null | undefined, name?: string | null, industry?: string | null): InstrumentKind {
+    const upper = symbol.toUpperCase().trim();
+    if (KNOWN_ETFS.has(upper)) return 'etf';
+    if (typeof profileType === 'string' && /etf|exchange traded fund/i.test(profileType)) return 'etf';
+    if (typeof name === 'string' && /etf|exchange traded fund|trust/i.test(name)) {
+        // Keep the "trust" signal narrow — it also matches REITs / closed-end funds,
+        // which we don't want to flip to ETF. Require an actual ETF mention.
+        if (/etf|exchange traded fund/i.test(name)) return 'etf';
+    }
+    if (typeof industry === 'string' && /etf|exchange traded fund/i.test(industry)) return 'etf';
+    // No signal either way — unknown bucket (scored separately, shows stock axes).
+    return 'unknown';
+}
 
 interface ScoredDef {
     id: string;
@@ -26,6 +53,7 @@ interface ScoredDef {
     rawFormat: ValueFormat;
     approx?: string;
     lowerIsBetter?: boolean;
+    appliesTo: AxisKindAppliesTo;
 }
 
 /**
@@ -36,11 +64,11 @@ interface ScoredDef {
  */
 const SCORED: ScoredDef[] = [
     // Earnings yield (E/P) so that "right = cheaper" and a loss-making firm does not break the axis.
-    { id: 'v_ey', section: 'Value', labelEn: 'Earnings yield (E/P)', labelZh: '盈利收益率', rawFormat: 'pct', read: (r) => { const pe = fin(r.metric.peTTM); return pe === null || pe === 0 ? null : 100 / pe; } },
-    { id: 'g_rev_yoy', section: 'Growth', labelEn: 'Revenue growth', labelZh: '营收同比增速', rawFormat: 'pct', read: (r) => fin(r.metric.revenueGrowthTTMYoy) },
-    { id: 'g_eps_yoy', section: 'Growth', labelEn: 'EPS growth', labelZh: 'EPS 同比增速', rawFormat: 'pct', read: (r) => fin(r.metric.epsGrowthTTMYoy) },
-    { id: 'q_roe', section: 'Quality', labelEn: 'ROE', labelZh: '净资产收益率', rawFormat: 'pct', read: (r) => fin(r.metric.roeTTM) },
-    { id: 'q_gm', section: 'Quality', labelEn: 'Gross margin', labelZh: '毛利率', rawFormat: 'pct', read: (r) => fin(r.metric.grossMarginTTM) },
+    { id: 'v_ey', section: 'Value', labelEn: 'Earnings yield (E/P)', labelZh: '盈利收益率', rawFormat: 'pct', read: (r) => { const pe = fin(r.metric.peTTM); return pe === null || pe === 0 ? null : 100 / pe; }, appliesTo: 'stock' },
+    { id: 'g_rev_yoy', section: 'Growth', labelEn: 'Revenue growth', labelZh: '营收同比增速', rawFormat: 'pct', read: (r) => fin(r.metric.revenueGrowthTTMYoy), appliesTo: 'stock' },
+    { id: 'g_eps_yoy', section: 'Growth', labelEn: 'EPS growth', labelZh: 'EPS 同比增速', rawFormat: 'pct', read: (r) => fin(r.metric.epsGrowthTTMYoy), appliesTo: 'stock' },
+    { id: 'q_roe', section: 'Quality', labelEn: 'ROE', labelZh: '净资产收益率', rawFormat: 'pct', read: (r) => fin(r.metric.roeTTM), appliesTo: 'stock' },
+    { id: 'q_gm', section: 'Quality', labelEn: 'Gross margin', labelZh: '毛利率', rawFormat: 'pct', read: (r) => fin(r.metric.grossMarginTTM), appliesTo: 'stock' },
     {
         id: 'p_52w_pos', section: 'Momentum', labelEn: '52-week range position', labelZh: '52 周区间位置', rawFormat: 'pct',
         read: (r) => {
@@ -49,15 +77,16 @@ const SCORED: ScoredDef[] = [
             const px = fin(r.price);
             return hi !== null && lo !== null && px !== null && hi > lo ? Math.min(100, Math.max(0, (100 * (px - lo)) / (hi - lo))) : null;
         },
+        appliesTo: 'universal',
     },
     // 26 weeks, not 13: the 13-week return is an outcome axis, and one number must not be both cause and effect.
-    { id: 'p_6m', section: 'Momentum', labelEn: '26-week return', labelZh: '近 6 月涨幅', rawFormat: 'spct', read: (r) => fin(r.metric['26WeekPriceReturnDaily']) },
-    { id: 'v_pb', section: 'Value', labelEn: 'Book yield (B/P)', labelZh: '市净率倒数', rawFormat: 'pct', read: (r) => { const pb = fin(r.metric.pbQuarterly) ?? fin(r.metric.pbAnnual); return pb !== null && pb > 0 ? 100 / pb : null; } },
-    { id: 'v_ps', section: 'Value', labelEn: 'Sales yield (S/P)', labelZh: '市销率倒数', rawFormat: 'pct', read: (r) => { const ps = fin(r.metric.psTTM); return ps !== null && ps > 0 ? 100 / ps : null; } },
-    { id: 'v_dy', section: 'Value', labelEn: 'Dividend yield', labelZh: '股息率', rawFormat: 'pct', read: (r) => fin(r.metric.dividendYieldIndicatedAnnual) },
-    { id: 'q_nm', section: 'Quality', labelEn: 'Net margin', labelZh: '净利率', rawFormat: 'pct', read: (r) => fin(r.metric.netProfitMarginTTM) },
-    { id: 'q_lev', section: 'Quality', labelEn: 'Debt / equity (lower is better)', labelZh: '负债权益比', rawFormat: 'ratio', lowerIsBetter: true, read: (r) => fin(r.metric['totalDebt/totalEquityQuarterly']) },
-    { id: 'p_1y', section: 'Momentum', labelEn: '52-week return', labelZh: '近 1 年涨幅', rawFormat: 'spct', read: (r) => fin(r.metric['52WeekPriceReturnDaily']) },
+    { id: 'p_6m', section: 'Momentum', labelEn: '26-week return', labelZh: '近 6 月涨幅', rawFormat: 'spct', read: (r) => fin(r.metric['26WeekPriceReturnDaily']), appliesTo: 'universal' },
+    { id: 'v_pb', section: 'Value', labelEn: 'Book yield (B/P)', labelZh: '市净率倒数', rawFormat: 'pct', read: (r) => { const pb = fin(r.metric.pbQuarterly) ?? fin(r.metric.pbAnnual); return pb !== null && pb > 0 ? 100 / pb : null; }, appliesTo: 'stock' },
+    { id: 'v_ps', section: 'Value', labelEn: 'Sales yield (S/P)', labelZh: '市销率倒数', rawFormat: 'pct', read: (r) => { const ps = fin(r.metric.psTTM); return ps !== null && ps > 0 ? 100 / ps : null; }, appliesTo: 'stock' },
+    { id: 'v_dy', section: 'Value', labelEn: 'Dividend yield', labelZh: '股息率', rawFormat: 'pct', read: (r) => fin(r.metric.dividendYieldIndicatedAnnual), appliesTo: 'universal' },
+    { id: 'q_nm', section: 'Quality', labelEn: 'Net margin', labelZh: '净利率', rawFormat: 'pct', read: (r) => fin(r.metric.netProfitMarginTTM), appliesTo: 'stock' },
+    { id: 'q_lev', section: 'Quality', labelEn: 'Debt / equity (lower is better)', labelZh: '负债权益比', rawFormat: 'ratio', lowerIsBetter: true, read: (r) => fin(r.metric['totalDebt/totalEquityQuarterly']), appliesTo: 'stock' },
+    { id: 'p_1y', section: 'Momentum', labelEn: '52-week return', labelZh: '近 1 年涨幅', rawFormat: 'spct', read: (r) => fin(r.metric['52WeekPriceReturnDaily']), appliesTo: 'universal' },
 ];
 
 // Sentiment (Adanos, Mongo-only). Never fetched live from /eye: Adanos free is
@@ -65,9 +94,9 @@ const SCORED: ScoredDef[] = [
 // snapshots the Inngest collector already wrote; reason=no-data when a symbol
 // has never been collected. Scores are percentiles like every other feature axis.
 const SENTIMENT_SCORED: ScoredDef[] = [
-    { id: 'x_sent_buzz', section: 'Sentiment', labelEn: 'Avg. buzz (Adanos)', labelZh: '平均 buzz（Adanos）', rawFormat: 'num', read: (r) => fin(r.sentiment?.averageBuzz) },
-    { id: 'x_sent_bull', section: 'Sentiment', labelEn: 'Bullish avg', labelZh: '多头平均占比', rawFormat: 'pct', read: (r) => fin(r.sentiment?.bullishAverage) },
-    { id: 'x_sent_cov', section: 'Sentiment', labelEn: 'Source coverage', labelZh: '来源覆盖（/4）', rawFormat: 'num', read: (r) => fin(r.sentiment?.coverage) },
+    { id: 'x_sent_buzz', section: 'Sentiment', labelEn: 'Avg. buzz (Adanos)', labelZh: '平均 buzz（Adanos）', rawFormat: 'num', read: (r) => fin(r.sentiment?.averageBuzz), appliesTo: 'universal' },
+    { id: 'x_sent_bull', section: 'Sentiment', labelEn: 'Bullish avg', labelZh: '多头平均占比', rawFormat: 'pct', read: (r) => fin(r.sentiment?.bullishAverage), appliesTo: 'universal' },
+    { id: 'x_sent_cov', section: 'Sentiment', labelEn: 'Source coverage', labelZh: '来源覆盖（/4）', rawFormat: 'num', read: (r) => fin(r.sentiment?.coverage), appliesTo: 'universal' },
     {
         id: 'x_sent_loc',
         section: 'Sentiment',
@@ -75,6 +104,7 @@ const SENTIMENT_SCORED: ScoredDef[] = [
         labelZh: '情绪定位（综合）',
         rawFormat: 'num',
         approx: 'mean(percentile buzz, percentile bullish, coverage×25) — equal-weighted, descriptive only',
+        appliesTo: 'universal',
         read: (r) => {
             // Composite location score built from percentile scores — computed inside
             // percentileScores for x_sent_loc itself below; here we return a proxy
@@ -114,6 +144,21 @@ export const AXIS_CATALOG_IDS = [
     // below — place it first so the catalog groups read top-down.
     'x_sent_loc', 'x_sent_buzz', 'x_sent_bull', 'x_sent_cov',
 ];
+
+/**
+ * Default axis layout when the selection is ETF-only. Same universal axes as the
+ * stock default, but stock-only fundamentals (E/P, revenue/EPS growth, ROE, gross margin,
+ * book/sales yield, net margin, leverage, analyst consensus) are swapped out.
+ * Order mirrors DEFAULT_AXIS_IDS position-by-position where the axis is universal.
+ */
+export const DEFAULT_ETF_AXIS_IDS = [
+    'p_52w_pos', 'p_6m', 'p_beta', 's_mcap', 's_dvol',
+    'a_ruler', 'a_ruler_retro', 'r_today', 'r_1m', 'r_1q',
+];
+
+/** Axis ids whose values only make sense for one instrument type (stock vs ETF). */
+export const STOCK_ONLY_AXIS_IDS = new Set(['v_ey', 'g_rev_yoy', 'g_eps_yoy', 'q_roe', 'q_gm', 'v_pb', 'v_ps', 'q_nm', 'q_lev', 'x_analyst']);
+export const ETF_ONLY_AXIS_IDS = new Set<string>([]); // populated after capture; see Step 1 gate in plan
 
 export const OUTCOME_AXIS_IDS = ['r_today', 'r_1m', 'r_1q'] as const;
 
@@ -203,16 +248,44 @@ export function buildExplainView(
     const raw: Record<string, CellValue[]> = {};
     const axes = new Map<string, PcpAxis>();
 
+    /**
+     * Per-kind percentile scoring: a stock's E/P percentile is among stocks, an ETF's
+     * among ETFs — the two universes never pool, so an ETF never drags a stock's
+     * rank (or vice versa). When a kind bucket has fewer than `minValid` readings,
+     * percentileScores returns null for that bucket (same missing-lane behaviour
+     * as a thin universe today). `unknown` rows score in their own bucket.
+     */
+    function perKindScores(readings: (number | null)[], kinds: InstrumentKind[], higherIsBetter = true): (number | null)[] {
+        const out: (number | null)[] = readings.map(() => null);
+        const buckets = new Map<InstrumentKind, { idx: number[]; vals: (number | null)[] }>();
+        kinds.forEach((k, idx) => {
+            let b = buckets.get(k);
+            if (!b) {
+                b = { idx: [], vals: [] };
+                buckets.set(k, b);
+            }
+            b.idx.push(idx);
+            b.vals.push(readings[idx]);
+        });
+        for (const b of buckets.values()) {
+            const scores = percentileScores(b.vals, { higherIsBetter });
+            scores.forEach((s, i) => { out[b.idx[i]] = s; });
+        }
+        return out;
+    }
+
+    const rowKinds = rows.map((r) => r.kind ?? 'unknown');
+
     for (const d of SCORED) {
         const readings = rows.map(d.read);
         raw[d.id] = readings;
-        columns[d.id] = percentileScores(readings, { higherIsBetter: !d.lowerIsBetter });
-        axes.set(d.id, axisFrom({ id: d.id, labelEn: d.labelEn, labelZh: d.labelZh, section: d.section, role: 'feature', kind: 'linear', format: 'score', rawFormat: d.rawFormat, isScore: true, verified: true, approx: d.approx }, columns[d.id], reasonFor(readings, false)));
+        columns[d.id] = perKindScores(readings, rowKinds, !d.lowerIsBetter);
+        axes.set(d.id, axisFrom({ id: d.id, labelEn: d.labelEn, labelZh: d.labelZh, section: d.section, role: 'feature', kind: 'linear', format: 'score', rawFormat: d.rawFormat, isScore: true, verified: true, approx: d.approx, appliesTo: d.appliesTo }, columns[d.id], reasonFor(readings, false)));
     }
 
     const beta = rows.map((r) => fin(r.metric.beta));
     columns.p_beta = beta;
-    axes.set('p_beta', axisFrom({ id: 'p_beta', labelEn: 'Beta (risk)', labelZh: 'Beta', section: 'Momentum', role: 'feature', kind: 'linear', format: 'ratio', domain: domainFromValues('linear', beta), verified: true }, beta, reasonFor(beta, false)));
+    axes.set('p_beta', axisFrom({ id: 'p_beta', labelEn: 'Beta (risk)', labelZh: 'Beta', section: 'Momentum', role: 'feature', kind: 'linear', format: 'ratio', domain: domainFromValues('linear', beta), verified: true, appliesTo: 'universal' }, beta, reasonFor(beta, false)));
 
     const mcap = rows.map((r) => {
         const fromProfile = fin(r.marketCap);
@@ -221,16 +294,16 @@ export function buildExplainView(
         return v !== null && v > 0 ? v : null;
     });
     columns.s_mcap = mcap;
-    axes.set('s_mcap', axisFrom({ id: 's_mcap', labelEn: 'Market cap', labelZh: '市值（对数）', section: 'Size & liquidity', role: 'feature', kind: 'log', format: 'usdM', domain: domainFromValues('log', mcap), verified: true }, mcap, reasonFor(mcap, false)));
+    axes.set('s_mcap', axisFrom({ id: 's_mcap', labelEn: 'Market cap', labelZh: '市值（对数）', section: 'Size & liquidity', role: 'feature', kind: 'log', format: 'usdM', domain: domainFromValues('log', mcap), verified: true, appliesTo: 'universal' }, mcap, reasonFor(mcap, false)));
 
     // 10-day average volume x price. Finnhub's volume unit is unverified; if it is in millions of shares this is USD millions.
     const dvol = rows.map((r) => { const v = fin(r.metric['10DayAverageTradingVolume']); const p = fin(r.price); return v !== null && p !== null && v > 0 && p > 0 ? v * p : null; });
     columns.s_dvol = dvol;
-    axes.set('s_dvol', axisFrom({ id: 's_dvol', labelEn: 'Avg. dollar volume', labelZh: '日均成交额（对数）', section: 'Size & liquidity', role: 'feature', kind: 'log', format: 'usdM', domain: domainFromValues('log', dvol), approx: 'Volume unit unverified' }, dvol, reasonFor(dvol, false)));
+    axes.set('s_dvol', axisFrom({ id: 's_dvol', labelEn: 'Avg. dollar volume', labelZh: '日均成交额（对数）', section: 'Size & liquidity', role: 'feature', kind: 'log', format: 'usdM', domain: domainFromValues('log', dvol), approx: 'Volume unit unverified', appliesTo: 'universal' }, dvol, reasonFor(dvol, false)));
 
     const analyst = rows.map((r) => fin(r.recommendation));
     columns.x_analyst = analyst;
-    axes.set('x_analyst', axisFrom({ id: 'x_analyst', labelEn: 'Analyst consensus', labelZh: '分析师共识（1 卖 — 5 买）', section: 'Sentiment', role: 'feature', kind: 'linear', format: 'ratio', domain: [1, 5], verified: true }, analyst, reasonFor(analyst, false)));
+    axes.set('x_analyst', axisFrom({ id: 'x_analyst', labelEn: 'Analyst consensus', labelZh: '分析师共识（1 卖 — 5 买）', section: 'Sentiment', role: 'feature', kind: 'linear', format: 'ratio', domain: [1, 5], verified: true, appliesTo: 'stock' }, analyst, reasonFor(analyst, false)));
 
     // ---------------------------------------------------------------------------
     // Sentiment (Adanos, Mongo-only). x_sent_loc is a composite location score:
@@ -243,8 +316,8 @@ export function buildExplainView(
     for (const d of sentScored) {
         const readings = rows.map(d.read);
         raw[d.id] = readings;
-        columns[d.id] = percentileScores(readings);
-        axes.set(d.id, axisFrom({ id: d.id, labelEn: d.labelEn, labelZh: d.labelZh, section: d.section, role: 'sentiment', kind: 'linear', format: 'score', rawFormat: d.rawFormat, isScore: true, verified: true, approx: 'Adanos snapshots (Mongo), Reddit+X+News+Polymarket' }, columns[d.id], reasonFor(readings, false)));
+        columns[d.id] = perKindScores(readings, rowKinds);
+        axes.set(d.id, axisFrom({ id: d.id, labelEn: d.labelEn, labelZh: d.labelZh, section: d.section, role: 'sentiment', kind: 'linear', format: 'score', rawFormat: d.rawFormat, isScore: true, verified: true, approx: 'Adanos snapshots (Mongo), Reddit+X+News+Polymarket', appliesTo: d.appliesTo }, columns[d.id], reasonFor(readings, false)));
     }
     // Composite: mean of the three percentile scores, per row (null when any is null).
     const locDef = SENTIMENT_SCORED.find((d) => d.id === 'x_sent_loc')!;
@@ -255,7 +328,7 @@ export function buildExplainView(
     const locRaw = rows.map((r) => locDef.read(r));
     raw.x_sent_loc = locRaw;
     columns.x_sent_loc = locScores;
-    axes.set('x_sent_loc', axisFrom({ id: locDef.id, labelEn: locDef.labelEn, labelZh: locDef.labelZh, section: locDef.section, role: 'sentiment', kind: 'linear', format: 'score', rawFormat: 'num', isScore: true, verified: true, approx: locDef.approx }, columns.x_sent_loc, reasonFor(locScores, false)));
+    axes.set('x_sent_loc', axisFrom({ id: locDef.id, labelEn: locDef.labelEn, labelZh: locDef.labelZh, section: locDef.section, role: 'sentiment', kind: 'linear', format: 'score', rawFormat: 'num', isScore: true, verified: true, approx: locDef.approx, appliesTo: locDef.appliesTo }, columns.x_sent_loc, reasonFor(locScores, false)));
 
     // ---------------------------------------------------------------------------
     // Symbolic layer (astro, never scored, never weighted). All values are computed
@@ -269,7 +342,7 @@ export function buildExplainView(
         if (!retro.has(p)) retro.set(p, isRetrograde(p, asOf));
         return retro.get(p) ? 'Retrograde' : 'Direct';
     });
-    const astroBase = { section: 'Symbolic layer', role: 'astro' as AxisRole, kind: 'categorical' as const, format: 'num' as const, verified: true, approx: 'Traditional correspondence, not evidence' };
+    const astroBase = { section: 'Symbolic layer', role: 'astro' as AxisRole, kind: 'categorical' as const, format: 'num' as const, verified: true, approx: 'Traditional correspondence, not evidence', appliesTo: 'universal' as AxisKindAppliesTo };
     axes.set('a_ruler', axisFrom({ ...astroBase, id: 'a_ruler', labelEn: 'Ruling planet', labelZh: '板块守护星（传统对应）' }, columns.a_ruler));
     axes.set('a_ruler_retro', axisFrom({ ...astroBase, id: 'a_ruler_retro', labelEn: 'Ruler motion', labelZh: '守护星顺逆行' }, columns.a_ruler_retro));
 
@@ -354,8 +427,8 @@ export function buildExplainView(
     for (const [id, en, zh, read, verified] of outcomes) {
         const values = rows.map(read);
         columns[id] = values;
-        rank[id] = percentileScores(values);
-        axes.set(id, axisFrom({ id, labelEn: en, labelZh: zh, section: 'Price outcome', role: 'outcome', kind: 'linear', format: 'spct', domain: outcomeDomain(values), verified }, values, reasonFor(values, false)));
+        rank[id] = perKindScores(values, rowKinds);
+        axes.set(id, axisFrom({ id, labelEn: en, labelZh: zh, section: 'Price outcome', role: 'outcome', kind: 'linear', format: 'spct', domain: outcomeDomain(values), verified, appliesTo: 'universal' }, values, reasonFor(values, false)));
     }
 
     return {
@@ -377,6 +450,7 @@ export function buildExplainView(
             raw,
             rank,
             selectedIndex: rows.map((r) => { const i = selected.indexOf(r.symbol); return i < 0 ? null : i; }),
+            kinds: rowKinds,
         },
     };
 }

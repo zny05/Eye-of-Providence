@@ -55,6 +55,8 @@ type FinnhubCompanyProfile = {
     ticker?: string;
     finnhubIndustry?: string;
     weburl?: string;
+    /** Finnhub's own instrument-type string (e.g. 'common_stock', 'unit'). No reliable "etf" value — see classifyInstrument. */
+    type?: string;
 };
 
 type SearchStockCandidate = FinnhubSearchResult & {
@@ -308,6 +310,7 @@ export async function getCompanyProfile(symbol: string, opts?: { forceRefresh?: 
             ticker: typeof p.ticker === 'string' ? p.ticker : undefined,
             finnhubIndustry: typeof p.finnhubIndustry === 'string' ? p.finnhubIndustry : undefined,
             weburl: typeof p.weburl === 'string' ? p.weburl : undefined,
+            type: typeof p.type === 'string' ? p.type : undefined,
         } as FinnhubCompanyProfile;
     }
     try {
