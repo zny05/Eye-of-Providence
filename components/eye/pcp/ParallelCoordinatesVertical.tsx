@@ -195,26 +195,45 @@ export default function ParallelCoordinatesVertical({ axes, catalog, table, reve
     const pendingCursor = useRef<{ x: number; y: number } | null>(null);
     const hoverTimer = useRef<number | null>(null);
     const paintHoverTimer = useRef<number | null>(null);
-    // Height is computed from the *actual rendered content*, not a hand-wavy
-    // budget. Our tooltip is a flex column inside a fixed-height box; any
-    // number pinned too low lets the dl eat into the header visually (the
-    // header sits on a flex baseline, its painted glyphs extend past the box's
-    // overflow:hidden clip — screenshot 2026-11-09_115753 shows the symbol line
-    // entirely missing, which is exactly the off-by-rows effect).
-    // Padding 20 + header 2×15 (lineHeight 1.2 at 12px) + dl margin 6 + n×15.
-    const tipHeight = Math.ceil(56 + n * 15);
+    // The tooltip must size to its content, not to a hand-computed pixel
+    // budget. Root cause of the disappearing symbol header (screenshots
+    // 2026-11-09_115753 / 121059): the box had a fixed height + overflow:hidden
+    // inside a flex column, and the header <p> carried overflow:hidden itself.
+    // In flexbox, an item whose overflow is not visible gets an automatic
+    // minimum size of 0, so the dl could squeeze the header to zero height and
+    // the budget (56 + n*15) was ~25px short of the real content height for
+    // 16 axes (dl rows are 14.4px + 2px gap each, not 15px flat). Any fixed
+    // budget guesses wrong again the moment font size or gap changes.
+    // Fix: natural height (no height / no overflow clip), header pinned with
+    // flex-none, and the measured height fed back into the above/below flip.
+    const estimatedTipHeight = Math.ceil(78 + n * 17);
+    const tipHeightRef = useRef(estimatedTipHeight);
 
     const paintTooltip = useCallback((x: number, y: number) => {
         if (!tooltipRef.current) return;
+        const h = tipHeightRef.current || estimatedTipHeight;
         // Vertical flip: if the box would spill past the stage bottom, place
         // it above the cursor instead — mirroring horizontal clamp logic.
-        const belowWouldOverflow = y + TIP_OFFSET + tipHeight > g.H;
-        const ty = belowWouldOverflow ? Math.max(0, y - tipHeight - TIP_OFFSET) : y + TIP_OFFSET;
+        const belowWouldOverflow = y + TIP_OFFSET + h > g.H;
+        const ty = belowWouldOverflow ? Math.max(0, y - h - TIP_OFFSET) : y + TIP_OFFSET;
         const tx = Math.min(x + TIP_OFFSET, Math.max(0, g.W - TOOLTIP_W - 4));
         tooltipRef.current.style.transform = `translate(${tx}px, ${ty}px)`;
         tooltipRef.current.style.left = '0px';
         tooltipRef.current.style.top = '0px';
-    }, [g.H, g.W, tipHeight]);
+    }, [g.H, g.W, estimatedTipHeight]);
+
+    // After mount / axis-count change, measure the real box and re-paint so
+    // the flip decision uses the true height, not the estimate.
+    useEffect(() => {
+        if (tipRow === undefined) return;
+        const el = tooltipRef.current;
+        if (!el) return;
+        const h = el.offsetHeight;
+        if (h > 0 && h !== tipHeightRef.current) {
+            tipHeightRef.current = h;
+            if (pendingCursor.current) paintTooltip(pendingCursor.current.x, pendingCursor.current.y);
+        }
+    });
 
     const scheduleHover = useCallback((r: number | null) => {
         if (hoverTimer.current !== null) window.clearTimeout(hoverTimer.current);
@@ -309,33 +328,37 @@ export default function ParallelCoordinatesVertical({ axes, catalog, table, reve
                             data-eye-tooltip
                             className="pointer-events-none absolute z-20 w-[240px] rounded-lg border border-line-strong bg-card/95 p-2.5 text-[12px] shadow-xl"
                             style={{
-                                // Fixed height per axis count keeps the box from resizing as you
-                                // cross lines (the old layout thrash came from variable height +
-                                // variable text interleaved with cursor re-renders). The container
-                                // paints a fixed budget; overflow is clipped, never reflowed.
-                                // Position is written to the same element by paintTooltip() via
-                                // transform — this initial top/left is just the first paint.
+                                // Natural height: the box grows to fit the header +
+                                // one dl row per axis. Height changes only when the
+                                // axis COUNT changes (not while moving between
+                                // lines), so the chart never reflows mid-hover.
+                                // Never re-add height/overflow:hidden here — that
+                                // pair is what clipped the symbol header away
+                                // (flex item with overflow:hidden gets min-height
+                                // 0 and the dl squeezes it shut).
+                                // Position is written by paintTooltip() via
+                                // transform; this top/left is just the first paint.
                                 left: 0,
                                 top: 0,
-                                height: tipHeight,
                                 display: 'flex',
                                 flexDirection: 'column',
                                 transform: 'translateZ(0)',
                                 willChange: 'transform, opacity',
-                                overflow: 'hidden',
-                                contain: 'layout size',
-                                // The only thing that collapses is opacity — no layout, no size,
-                                // so hovering the chart can never push the canvas wider.
                                 opacity: cursor || pendingCursor.current ? 1 : 0,
                                 transition: 'opacity 80ms cubic-bezier(0.33, 1, 0.68, 1)',
                                 backfaceVisibility: 'hidden',
                             }}
                         >
-                            <p className="flex min-w-0 items-baseline gap-1.5 font-semibold text-foreground" style={{ overflow: 'hidden', whiteSpace: 'nowrap', lineHeight: '1.2' }}>
-                                <span className="mono flex-none">{table.ids[tipRow]}</span>
-                                <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{table.labels[tipRow] !== table.ids[tipRow] ? table.labels[tipRow] : ''}</span>
+                            {/* Title row — mirrors the HD Financials reference:
+                                large bold symbol + name, never clipped. flex-none
+                                keeps the dl from shrinking it. */}
+                            <p className="flex min-w-0 flex-none items-baseline gap-2 leading-tight" style={{ whiteSpace: 'nowrap' }}>
+                                <span className="mono text-[20px] font-bold tracking-tight text-foreground">{table.ids[tipRow]}</span>
+                                {table.labels[tipRow] !== table.ids[tipRow] && (
+                                    <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-foreground/90">{table.labels[tipRow]}</span>
+                                )}
                             </p>
-                            <p className="overflow-hidden text-ellipsis whitespace-nowrap text-faint" style={{ lineHeight: '1.2' }}>{table.group[tipRow] ?? 'Industry unknown'}{!tipSelected && canAdd ? ' · click to add' : ''}</p>
+                            <p className="mt-0.5 flex-none truncate text-[11px] leading-tight text-faint">{table.group[tipRow] ?? 'Industry unknown'}{!tipSelected && canAdd ? ' · click to add' : ''}</p>
                             <dl className="mt-1.5 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5">
                                 {axes.map((a) => {
                                     const v = table.columns[a.id]?.[tipRow];
