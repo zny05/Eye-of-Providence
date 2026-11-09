@@ -316,7 +316,7 @@ export default function EyeWorkbench({ data }: { data: EyeExplain }) {
 
                     <ul className="flex flex-col gap-1 px-1 text-[11.5px] leading-snug text-faint">
                         {view.skipped.length > 0 && <li>No readable data for {view.skipped.join(', ')} (Finnhub free covers US stocks only).</li>}
-                        <li>Background: {backgroundCount} peers from Finnhub&apos;s peer list, topped up from your watchlist. Industry is Finnhub&apos;s own classification.</li>
+                        <li>Background: {backgroundCount} grey peers, drawn only from your watchlist (at most 14). No Finnhub peer-list symbols are used. Industry is Finnhub&apos;s own classification.</li>
                         <li>Axes marked &quot;unverified&quot; use Finnhub metric names or units that have not been checked against a live response; they may be empty or mis-scaled. The 1-month and 1-quarter changes are price returns, not total returns.</li>
                         <li>The macro-environment axis needs the FRED pipeline, which is not built yet.</li>
                         <li>Eye of Omniscience explains what already happened with public data. It is for research and education only, is not investment advice, and does not forecast prices. The symbolic layer is a cultural overlay with no demonstrated effect on prices.</li>

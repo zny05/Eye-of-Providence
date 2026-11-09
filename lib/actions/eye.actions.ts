@@ -1,7 +1,7 @@
 'use server';
 
 import { requireUserId } from '@/lib/better-auth/auth';
-import { getCompanyProfile, getLiveQuotes, getStockFactorMetrics, getStockPeers, getStockRecommendation } from '@/lib/actions/finnhub.actions';
+import { getCompanyProfile, getLiveQuotes, getStockFactorMetrics, getStockRecommendation } from '@/lib/actions/finnhub.actions';
 import { getStockSentimentFromDb } from '@/lib/actions/adanos.actions';
 import { getUserWatchlist } from '@/lib/actions/watchlist.actions';
 import { buildExplainView, type ExplainView } from '@/lib/eye/explain-view';
@@ -9,9 +9,13 @@ import { getCosmyDayEvents, getCosmyDayTransit, nextEvent, nextEventDays, eventC
 import { parseSymbols } from '@/lib/eye/symbols';
 import type { StockFactorRaw, StockSentimentRaw } from '@/lib/eye/types';
 
-// Grey peers give the percentile scale and the "how does it compare" backdrop; Finnhub free allows ~60 calls a minute.
+// Grey peers are the "how does it compare" backdrop. Finnhub free allows ~60
+// calls a minute, but the background is capped by BACKGROUND_MAX so a 12-symbol
+// selection plus 14 peers never bursts past the limit on one page load.
+// Background now comes ONLY from the user's Watchlist — Finnhub /stock/peers
+// was removed because peers outside the Watchlist appeared as grey lines the
+// user never asked for. Symbols not in the Watchlist never appear as peers.
 const BACKGROUND_MAX = 14;
-const PEER_SOURCES = 3;
 
 export interface EyeExplain {
     selected: string[];
@@ -20,16 +24,11 @@ export interface EyeExplain {
     view: ExplainView | null;
 }
 
-// Peers of the first few selected symbols (round-robin), then the user's own watchlist, up to BACKGROUND_MAX.
-async function pickBackground(selected: string[], watchlist: string[]): Promise<string[]> {
-    const lists = await Promise.all(selected.slice(0, PEER_SOURCES).map((s) => getStockPeers(s)));
-    const out: string[] = [];
-    const take = (symbol: string) => {
-        if (out.length < BACKGROUND_MAX && !selected.includes(symbol) && !out.includes(symbol)) out.push(symbol);
-    };
-    for (let i = 0; out.length < BACKGROUND_MAX && lists.some((l) => i < l.length); i++) lists.forEach((l) => l[i] && take(l[i]));
-    watchlist.forEach(take);
-    return out;
+// Background = the user's own Watchlist symbols only, capped at BACKGROUND_MAX.
+// No Finnhub /stock/peers — a symbol the user hasn't put in their Watchlist (or
+// selected) never shows up as a grey peer line.
+function pickBackground(selected: string[], watchlist: string[]): string[] {
+    return watchlist.filter((s) => !selected.includes(s)).slice(0, BACKGROUND_MAX);
 }
 
 /**
@@ -66,7 +65,7 @@ export async function getEyeExplain(requested: string[]): Promise<EyeExplain> {
     const watchlist = items.map((i) => ({ symbol: i.symbol, company: i.company || i.symbol }));
     if (selected.length === 0) return { selected, watchlist, backgroundCount: 0, view: null };
 
-    const background = await pickBackground(selected, watchlist.map((w) => w.symbol));
+    const background = pickBackground(selected, watchlist.map((w) => w.symbol));
     const universe = [...selected, ...background];
     const quotes = await getLiveQuotes(universe);
 
