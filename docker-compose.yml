@@ -15,7 +15,7 @@ services:
       - HTTP_PROXY=http://10.1.1.238:7890
       - HTTPS_PROXY=http://10.1.1.238:7890
       # 内网和本地服务不走代理（非常重要）
-      - NO_PROXY=localhost,127.0.0.1,mongodb,10.1.1.0/24,10.1.1.238,finnhub.io,*.finnhub.io
+      - NO_PROXY=localhost,127.0.0.1,mongodb,10.1.1.0/24,10.1.1.238,finnhub.io,*.finnhub.io,api.cosmyday.com,*.cosmyday.com,cosmyday.com
     restart: unless-stopped
     depends_on:
       mongodb:

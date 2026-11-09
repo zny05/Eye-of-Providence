@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { AXIS_CATALOG_IDS, buildExplainView, DEFAULT_AXIS_IDS } from '@/lib/eye/explain-view';
 import { meanOfAvailable, percentileScores } from '@/lib/eye/normalize';
 import { parseSymbols } from '@/lib/eye/symbols';
-import { MAX_AXES, MAX_SELECTED, type StockFactorRaw } from '@/lib/eye/types';
+import { DEFAULT_AXIS_COUNT, MAX_AXES, MAX_SELECTED, type StockFactorRaw } from '@/lib/eye/types';
 
 describe('parseSymbols', () => {
     it('uppercases, de-duplicates and drops invalid entries', () => {
@@ -53,7 +53,8 @@ describe('buildExplainView', () => {
 
     it('offers a catalog the user picks from, with the suggested 16 ending in the three price outcomes', () => {
         expect(axes.map((a) => a.id)).toEqual(AXIS_CATALOG_IDS);
-        expect(DEFAULT_AXIS_IDS).toHaveLength(MAX_AXES);
+        expect(DEFAULT_AXIS_IDS).toHaveLength(DEFAULT_AXIS_COUNT);
+        expect(DEFAULT_AXIS_IDS).toHaveLength(JSON.parse('16'));
         expect(DEFAULT_AXIS_IDS.slice(-3)).toEqual(['r_today', 'r_1m', 'r_1q']);
         for (const id of DEFAULT_AXIS_IDS) expect(AXIS_CATALOG_IDS).toContain(id);
         expect(new Set(AXIS_CATALOG_IDS).size).toBe(AXIS_CATALOG_IDS.length);
@@ -66,6 +67,13 @@ describe('buildExplainView', () => {
             const axis = axes.find((a) => a.id === id)!;
             expect(axis.role).toBe('astro');
             expect(axis.isScore).toBe(false);
+            expect(table.columns[id]).toBeDefined();
+        }
+        // Sentiment axes are scored and role=sentiment.
+        for (const id of ['x_sent_buzz', 'x_sent_bull', 'x_sent_cov', 'x_sent_loc']) {
+            const axis = axes.find((a) => a.id === id)!;
+            expect(axis.role).toBe('sentiment');
+            expect(axis.isScore).toBe(true);
             expect(table.columns[id]).toBeDefined();
         }
     });

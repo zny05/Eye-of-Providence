@@ -4,7 +4,8 @@ export type AxisKind = 'linear' | 'log' | 'categorical';
 export type ValueFormat = 'score' | 'pct' | 'spct' | 'ratio' | 'usdM' | 'num';
 export type CellValue = number | string | null;
 // feature = explains; outcome = the observed price result (never scored or weighted); astro = symbolic layer.
-export type AxisRole = 'feature' | 'outcome' | 'astro';
+// sentiment = Adanos multi-source sentiment aggregates (Reddit/X/News/Polymarket) — feature, scored, never weighted differently.
+export type AxisRole = 'feature' | 'outcome' | 'astro' | 'sentiment';
 
 // Why an axis might be empty, so the UI can explain itself instead of rendering an ambiguous gap.
 // ok = values present; fetch-failed = the live request failed (429/403/timeout); no-data = request
@@ -71,6 +72,25 @@ export const FACTOR_METRIC_KEYS = [
 
 export type FactorMetricKey = (typeof FACTOR_METRIC_KEYS)[number];
 
+/**
+ * Adanos multi-source sentiment aggregates for one symbol, from
+ * `AdanosSentimentSnapshot` (Mongo). `null` = no snapshot at all (never
+ * collected — Adanos free tier is 250/mo shared, so we never fetch live
+ * from /eye; reason=no-data then).
+ */
+export interface StockSentimentRaw {
+    /** Avg. buzz 0..100 across available Adanos sources (Reddit/X/News/Polymarket). */
+    averageBuzz: number | null;
+    /** Bullish average 0..100 (null when no source reports bullishPct). */
+    bullishAverage: number | null;
+    /** How many of the 4 sources have a snapshot (Coverage x/4). */
+    coverage: number | null;
+    /** Σ mentions (or trades for Polymarket) across available sources. */
+    totalMentions: number | null;
+    /** Most recent collection time — used for stale signalling in tooltips. */
+    latestCollectedAt: Date | null;
+}
+
 export interface StockFactorRaw {
     symbol: string;
     name: string;
@@ -80,9 +100,16 @@ export interface StockFactorRaw {
     changePct: number | null; // today's change vs previous close, in percent
     recommendation: number | null; // analyst consensus 1 (strong sell) .. 5 (strong buy)
     metric: Partial<Record<FactorMetricKey, number | null>>;
+    /** Adanos sentiment aggregates (Mongo snapshot only, never live). Optional for peers. */
+    sentiment?: StockSentimentRaw | null;
 }
 
 export const MAX_SELECTED = 12;
-// The user composes the chart: any 2 to 16 axes, each chosen independently from the catalog.
+// The user composes the chart: any 2 to 20 axes, each chosen independently from the catalog.
+// DEFAULT_AXIS_IDS (16) stays put; the 20-cap lets the 7 astro + 4 sentiment axes
+// coexist without evicting the defaults. Old URLs carry at most 16 ids anyway.
 export const MIN_AXES = 2;
-export const MAX_AXES = 16;
+export const MAX_AXES = 20;
+
+/** Length of the suggested default layout (deliberately less than MAX_AXES). */
+export const DEFAULT_AXIS_COUNT = 16;

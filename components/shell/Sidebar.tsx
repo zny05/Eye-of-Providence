@@ -3,9 +3,11 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { BookOpen, Code2, Eye, Gauge, Heart, Info, LayoutDashboard, LifeBuoy, LogOut, Search, Star } from "lucide-react";
 import { openSearch } from "@/components/SearchCommand";
 import { signOut } from "@/lib/actions/auth.actions";
+import { eyeHrefWithPersistedState } from "@/lib/eye/selection";
 import { cn } from "@/lib/utils";
 import { SIDEBAR_SPONSOR_SLOTS, sidebarSponsors } from "@/lib/sponsors";
 
@@ -27,6 +29,15 @@ const Sidebar = ({ user, watchlist }: SidebarProps) => {
     const router = useRouter();
     const partners = sidebarSponsors();
     const openSlots = SIDEBAR_SPONSOR_SLOTS - partners.length;
+    // Persisted Eye selection (?s= + ?axes=) survives module switches.
+    const [eyeHref, setEyeHref] = useState('/eye');
+    useEffect(() => {
+        // Re-read on every navigation so the href reflects the latest pick.
+        const update = () => setEyeHref(eyeHrefWithPersistedState());
+        update();
+        window.addEventListener('eye:selection-changed', update);
+        return () => window.removeEventListener('eye:selection-changed', update);
+    }, [pathname]);
 
     const handleSignOut = async () => {
         await signOut();
@@ -53,7 +64,7 @@ const Sidebar = ({ user, watchlist }: SidebarProps) => {
                     <Star /> <span className="flex-1">Watchlist</span>
                     <span className="num text-xs text-faint">{watchlist.length}</span>
                 </Link>
-                <Link href="/eye" className={cn('side-item', pathname.startsWith('/eye') && 'is-active')}>
+                <Link href={eyeHref} className={cn('side-item', pathname.startsWith('/eye') && 'is-active')}>
                     <Eye /> Eye of Omniscience
                 </Link>
             </nav>

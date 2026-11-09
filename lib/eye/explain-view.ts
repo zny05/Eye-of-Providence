@@ -60,10 +60,42 @@ const SCORED: ScoredDef[] = [
     { id: 'p_1y', section: 'Momentum', labelEn: '52-week return', labelZh: '近 1 年涨幅', rawFormat: 'spct', read: (r) => fin(r.metric['52WeekPriceReturnDaily']) },
 ];
 
+// Sentiment (Adanos, Mongo-only). Never fetched live from /eye: Adanos free is
+// 250 requests/month shared across every endpoint, so /eye reads only the
+// snapshots the Inngest collector already wrote; reason=no-data when a symbol
+// has never been collected. Scores are percentiles like every other feature axis.
+const SENTIMENT_SCORED: ScoredDef[] = [
+    { id: 'x_sent_buzz', section: 'Sentiment', labelEn: 'Avg. buzz (Adanos)', labelZh: '平均 buzz（Adanos）', rawFormat: 'num', read: (r) => fin(r.sentiment?.averageBuzz) },
+    { id: 'x_sent_bull', section: 'Sentiment', labelEn: 'Bullish avg', labelZh: '多头平均占比', rawFormat: 'pct', read: (r) => fin(r.sentiment?.bullishAverage) },
+    { id: 'x_sent_cov', section: 'Sentiment', labelEn: 'Source coverage', labelZh: '来源覆盖（/4）', rawFormat: 'num', read: (r) => fin(r.sentiment?.coverage) },
+    {
+        id: 'x_sent_loc',
+        section: 'Sentiment',
+        labelEn: 'Sentiment location',
+        labelZh: '情绪定位（综合）',
+        rawFormat: 'num',
+        approx: 'mean(percentile buzz, percentile bullish, coverage×25) — equal-weighted, descriptive only',
+        read: (r) => {
+            // Composite location score built from percentile scores — computed inside
+            // percentileScores for x_sent_loc itself below; here we return a proxy
+            // reading that percentileScores ranks. The raw location is reconstructed
+            // in buildExplainView as mean of the three percentile columns.
+            const buzz = fin(r.sentiment?.averageBuzz);
+            const bull = fin(r.sentiment?.bullishAverage);
+            const cov = fin(r.sentiment?.coverage);
+            if (buzz === null && bull === null && cov === null) return null;
+            // Legacy placeholder removed — actual value comes from percentileScores
+            // over the reconstructed composite below. Keep the signature for raw.
+            return buzz ?? bull ?? cov;
+        },
+    },
+];
+
 // Suggested starting layout — 16 axes (same cap as before). Widened astro layer:
-//   a_ruler (12) and a_ruler_retro (13) stay in place; the remaining new astro axes
-//   (a_moon_phase, a_sun_sign, a_ruler_sign, a_ruler_decl) are in the catalog below,
-//   reachable via “Add axis” without breaching the 16-cap.
+//   a_ruler (12) and a_ruler_retro (13) stay in place; the remaining 7 new astro axes
+//   and 3 new Sentiment axes are in the catalog below, reachable via “Add axis”.
+//   MAX_AXES was raised 16 -> 20 so the sentiment + astro axes can coexist with the
+//   16 defaults without evicting anything; defaults themselves are unchanged.
 export const DEFAULT_AXIS_IDS = [
     'v_ey', 'g_rev_yoy', 'g_eps_yoy', 'q_roe', 'q_gm', 'p_52w_pos', 'p_6m', 'p_beta', 's_mcap', 's_dvol', 'x_analyst',
     'a_ruler', 'a_ruler_retro', 'r_today', 'r_1m', 'r_1q',
@@ -78,6 +110,9 @@ export const AXIS_CATALOG_IDS = [
     ...DEFAULT_AXIS_IDS,
     'v_pb', 'v_ps', 'v_dy', 'q_nm', 'q_lev', 'p_1y',
     'a_moon_phase', 'a_sun_sign', 'a_ruler_sign', 'a_ruler_decl', 'a_ruler_speed', 'a_next_event_days', 'a_event_count_7d',
+    // Sentiment (Adanos, Mongo-only): x_sent_loc is the composite of the three
+    // below — place it first so the catalog groups read top-down.
+    'x_sent_loc', 'x_sent_buzz', 'x_sent_bull', 'x_sent_cov',
 ];
 
 export const OUTCOME_AXIS_IDS = ['r_today', 'r_1m', 'r_1q'] as const;
@@ -190,6 +225,31 @@ export function buildExplainView(
     const analyst = rows.map((r) => fin(r.recommendation));
     columns.x_analyst = analyst;
     axes.set('x_analyst', axisFrom({ id: 'x_analyst', labelEn: 'Analyst consensus', labelZh: '分析师共识（1 卖 — 5 买）', section: 'Sentiment', role: 'feature', kind: 'linear', format: 'ratio', domain: [1, 5], verified: true }, analyst, reasonFor(analyst, false)));
+
+    // ---------------------------------------------------------------------------
+    // Sentiment (Adanos, Mongo-only). x_sent_loc is a composite location score:
+    // percentile-score the three component axes first, then take their equal-weighted
+    // mean per row — so one scalar axis shows the multi-source consensus position and
+    // the three component axes (buzz / bullish / coverage) can be shaken out individually.
+    // Never fetched live: a symbol that was never collected is no-data by design.
+    // ---------------------------------------------------------------------------
+    const sentScored = SENTIMENT_SCORED.filter((d) => d.id !== 'x_sent_loc');
+    for (const d of sentScored) {
+        const readings = rows.map(d.read);
+        raw[d.id] = readings;
+        columns[d.id] = percentileScores(readings);
+        axes.set(d.id, axisFrom({ id: d.id, labelEn: d.labelEn, labelZh: d.labelZh, section: d.section, role: 'sentiment', kind: 'linear', format: 'score', rawFormat: d.rawFormat, isScore: true, verified: true, approx: 'Adanos snapshots (Mongo), Reddit+X+News+Polymarket' }, columns[d.id], reasonFor(readings, false)));
+    }
+    // Composite: mean of the three percentile scores, per row (null when any is null).
+    const locDef = SENTIMENT_SCORED.find((d) => d.id === 'x_sent_loc')!;
+    const locScores = rows.map((_, i) => {
+        const parts = ['x_sent_buzz', 'x_sent_bull', 'x_sent_cov'].map((id) => columns[id]?.[i]);
+        return parts.every((v): v is number => typeof v === 'number') ? (parts[0] + parts[1] + parts[2]) / 3 : null;
+    });
+    const locRaw = rows.map((r) => locDef.read(r));
+    raw.x_sent_loc = locRaw;
+    columns.x_sent_loc = locScores;
+    axes.set('x_sent_loc', axisFrom({ id: locDef.id, labelEn: locDef.labelEn, labelZh: locDef.labelZh, section: locDef.section, role: 'sentiment', kind: 'linear', format: 'score', rawFormat: 'num', isScore: true, verified: true, approx: locDef.approx }, columns.x_sent_loc, reasonFor(locScores, false)));
 
     // ---------------------------------------------------------------------------
     // Symbolic layer (astro, never scored, never weighted). All values are computed

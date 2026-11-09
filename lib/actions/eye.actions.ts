@@ -2,11 +2,12 @@
 
 import { requireUserId } from '@/lib/better-auth/auth';
 import { getCompanyProfile, getLiveQuotes, getStockFactorMetrics, getStockPeers, getStockRecommendation } from '@/lib/actions/finnhub.actions';
+import { getStockSentimentFromDb } from '@/lib/actions/adanos.actions';
 import { getUserWatchlist } from '@/lib/actions/watchlist.actions';
 import { buildExplainView, type ExplainView } from '@/lib/eye/explain-view';
 import { getCosmyDayEvents, nextEventDays, eventCountInDays } from '@/lib/eye/cosmyday';
 import { parseSymbols } from '@/lib/eye/symbols';
-import type { StockFactorRaw } from '@/lib/eye/types';
+import type { StockFactorRaw, StockSentimentRaw } from '@/lib/eye/types';
 
 // Grey peers give the percentile scale and the "how does it compare" backdrop; Finnhub free allows ~60 calls a minute.
 const BACKGROUND_MAX = 14;
@@ -31,6 +32,28 @@ async function pickBackground(selected: string[], watchlist: string[]): Promise<
     return out;
 }
 
+/**
+ * Adanos sentiment aggregates from Mongo only — never calls the Adanos API.
+ * Adanos free is 250 requests/month shared across every endpoint, so /eye
+ * must not burn it per page load; anything never collected stays no-data.
+ */
+async function getSentimentForSymbol(symbol: string): Promise<StockSentimentRaw | null> {
+    try {
+        const { insights, latestCollectedAt } = await getStockSentimentFromDb(symbol);
+        if (!insights) return null;
+        const totalMentions = insights.sources.reduce((sum, s) => sum + (s.metricValue ?? 0), 0);
+        return {
+            averageBuzz: insights.averageBuzz ?? null,
+            bullishAverage: insights.bullishAverage ?? null,
+            coverage: insights.availableSources ?? null,
+            totalMentions: totalMentions > 0 ? totalMentions : null,
+            latestCollectedAt: latestCollectedAt ?? null,
+        };
+    } catch {
+        return null;
+    }
+}
+
 export async function getEyeExplain(requested: string[]): Promise<EyeExplain> {
     // DB-first: getStockFactorMetrics / getCompanyProfile / getStockRecommendation read from the
     // FinnhubMetricSnapshot Mongo cache (TTL 12h) in steady state; live Finnhub is the miss/backfill
@@ -49,10 +72,13 @@ export async function getEyeExplain(requested: string[]): Promise<EyeExplain> {
 
     const stocks: StockFactorRaw[] = await Promise.all(
         universe.map(async (symbol) => {
-            const [profile, metric, recommendation] = await Promise.all([
+            const [profile, metric, recommendation, sentiment] = await Promise.all([
                 getCompanyProfile(symbol),
                 getStockFactorMetrics(symbol),
                 selected.includes(symbol) ? getStockRecommendation(symbol) : null,
+                // Sentiment is Mongo-only. Peers get it too so the percentile
+                // scale has neighbours, but only selected symbols are guaranteed warm.
+                getSentimentForSymbol(symbol),
             ]);
             return {
                 symbol,
@@ -63,6 +89,7 @@ export async function getEyeExplain(requested: string[]): Promise<EyeExplain> {
                 changePct: quotes[symbol]?.dp ?? null,
                 recommendation,
                 metric: metric ?? {},
+                sentiment,
             };
         }),
     );

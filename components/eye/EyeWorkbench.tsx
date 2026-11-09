@@ -10,14 +10,22 @@ import { AXIS_CATALOG_IDS, DEFAULT_AXIS_IDS, OUTCOME_AXIS_IDS } from '@/lib/eye/
 import { formatValue } from '@/lib/eye/format';
 import { EYE_THEME, SELECTED_PALETTE } from '@/lib/eye/pcp/color-scale';
 import { parseSymbols, SYMBOL_PATTERN } from '@/lib/eye/symbols';
-import { MAX_AXES, MAX_SELECTED, MIN_AXES } from '@/lib/eye/types';
+import { readPersistedAxes, readPersistedSymbols, writePersistedAxes, writePersistedSymbols } from '@/lib/eye/selection';
+import { DEFAULT_AXIS_COUNT, MAX_AXES, MAX_SELECTED, MIN_AXES } from '@/lib/eye/types';
 
 const selectClass = 'h-8 max-w-[220px] rounded-lg border border-line bg-hover px-2 text-[12.5px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-brand';
 
-// Axes from the address bar: known ids only, no repeats, at most 16; too few falls back to the suggested layout.
+// Axes from the address bar: known ids only, no repeats, at most MAX_AXES; too few
+// falls back to the persisted layout (which itself falls back to the defaults).
 function axesFromUrl(value: string | null): string[] {
     const ids = (value ?? '').split(',').filter((id, i, all) => AXIS_CATALOG_IDS.includes(id) && all.indexOf(id) === i).slice(0, MAX_AXES);
-    return ids.length >= MIN_AXES ? ids : DEFAULT_AXIS_IDS;
+    if (ids.length >= MIN_AXES) return ids;
+    const persisted = readPersistedAxes();
+    return persisted.length >= MIN_AXES ? persisted : DEFAULT_AXIS_IDS;
+}
+
+function notifySelectionChanged() {
+    window.dispatchEvent(new Event('eye:selection-changed'));
 }
 
 export default function EyeWorkbench({ data }: { data: EyeExplain }) {
@@ -32,7 +40,10 @@ export default function EyeWorkbench({ data }: { data: EyeExplain }) {
     const [hoverId, setHoverId] = useState<string | undefined>();
 
     // Selection changes re-render on the server; the axis layout stays in the URL so it survives that and a reload.
+    // Also mirrored into localStorage so the sidebar Eye link can resurrect them after a module switch.
     const go = useCallback((symbols: string[]) => {
+        writePersistedSymbols(symbols);
+        notifySelectionChanged();
         const qs = new URLSearchParams(window.location.search);
         if (symbols.length) qs.set('s', symbols.join(','));
         else qs.delete('s');
@@ -40,12 +51,23 @@ export default function EyeWorkbench({ data }: { data: EyeExplain }) {
         startTransition(() => router.replace(query ? `/eye?${query}` : '/eye'));
     }, [router]);
 
-    const firstRender = useRef(true);
+    // On first mount, if the URL carries no ?s= but localStorage does (module switch
+    // hit the bare /eye link), resurrect the pick via one replace so the server
+    // renders with the symbols rather than an empty workbench.
+    const firstRenderRef = useRef(true);
     useEffect(() => {
-        if (firstRender.current) {
-            firstRender.current = false;
-            return;
+        if (!firstRenderRef.current) return;
+        firstRenderRef.current = false;
+        const persisted = readPersistedSymbols();
+        if (!new URLSearchParams(window.location.search).has('s') && persisted.length) {
+            go(persisted);
         }
+    }, [go]);
+
+    useEffect(() => {
+        if (firstRenderRef.current) return;
+        writePersistedAxes(axisIds);
+        notifySelectionChanged();
         const qs = new URLSearchParams(window.location.search);
         if (axisIds.join(',') === DEFAULT_AXIS_IDS.join(',')) qs.delete('axes');
         else qs.set('axes', axisIds.join(','));
@@ -204,7 +226,7 @@ export default function EyeWorkbench({ data }: { data: EyeExplain }) {
                                             </optgroup>
                                         ))}
                                     </select>
-                                    <button type="button" className="btn btn-sm btn-ghost" onClick={() => { setAxisIds(DEFAULT_AXIS_IDS); setReversed({}); }} title="Back to the suggested 16 axes">
+                                    <button type="button" className="btn btn-sm btn-ghost" onClick={() => { setAxisIds(DEFAULT_AXIS_IDS); setReversed({}); }} title={`Back to the suggested ${DEFAULT_AXIS_COUNT} axes`}>
                                         <RotateCcw /> Reset
                                     </button>
                                 </div>

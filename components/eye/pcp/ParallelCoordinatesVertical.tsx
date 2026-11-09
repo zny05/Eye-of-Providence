@@ -182,6 +182,21 @@ export default function ParallelCoordinatesVertical({ axes, catalog, table, reve
     const interactive = (e: React.SyntheticEvent) => !!(e.target as Element).closest('[data-eye-interactive]');
     const pointer = useRef('mouse');
 
+    // The tooltip is positioned with a ref-shared transform (no React re-render per
+    // pointermove) and a fixed height per axis count, so hovering does not resize
+    // the PCP container or thrash the layout. The hover-highlight itself keeps
+    // using the rAF-throttled React state path.
+    const tooltipRef = useRef<HTMLDivElement>(null);
+    const pendingCursor = useRef<{ x: number; y: number } | null>(null);
+
+    const paintTooltip = useCallback(() => {
+        if (!tooltipRef.current || !pendingCursor.current) return;
+        const { x, y } = pendingCursor.current;
+        tooltipRef.current.style.transform = `translate(${Math.min(x + 14, Math.max(0, g.W - 250))}px, ${y + 14}px)`;
+        tooltipRef.current.style.left = '0px';
+        tooltipRef.current.style.top = '0px';
+    }, [g.W]);
+
     const onPointerMove = (e: React.PointerEvent) => {
         pointer.current = e.pointerType;
         if (e.pointerType !== 'mouse') return;
@@ -190,6 +205,9 @@ export default function ParallelCoordinatesVertical({ axes, catalog, table, reve
             return;
         }
         const { x, y } = point(e);
+        pendingCursor.current = { x, y };
+        // Tooltip paint (cheap, runs outside React): direct DOM, no layout.
+        if (tooltipRef.current) paintTooltip();
         cancelAnimationFrame(frame.current);
         frame.current = requestAnimationFrame(() => {
             const r = hit(x, y, 7);
@@ -245,10 +263,28 @@ export default function ParallelCoordinatesVertical({ axes, catalog, table, reve
                         />
                     ))}
 
-                    {tipRow !== undefined && cursor && (
+                    {tipRow !== undefined && (cursor || pendingCursor.current) && (
                         <div
+                            ref={tooltipRef}
+                            data-eye-tooltip
                             className="pointer-events-none absolute z-20 w-[240px] rounded-lg border border-line-strong bg-card/95 p-2.5 text-[12px] shadow-xl"
-                            style={{ left: Math.min(cursor.x + 14, Math.max(0, g.W - 250)), top: cursor.y + 14 }}
+                            style={{
+                                // Fixed height per axis count keeps the box from resizing as you
+                                // cross lines (the old layout thrash came from variable height +
+                                // variable text interleaved with cursor re-renders). The container
+                                // paints a fixed budget; overflow is clipped, never reflowed.
+                                // Position is written to the same element by paintTooltip() via
+                                // transform — this initial top/left is just the first paint.
+                                left: pendingCursor.current ? Math.min(pendingCursor.current.x + 14, Math.max(0, g.W - 250)) : (cursor ? Math.min(cursor.x + 14, Math.max(0, g.W - 250)) : 0),
+                                top: pendingCursor.current ? pendingCursor.current.y + 14 : (cursor ? cursor.y + 14 : 0),
+                                height: 18 + axes.length * 18 + 32,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                transform: 'translateZ(0)',
+                                willChange: 'transform',
+                                overflow: 'hidden',
+                                contain: 'layout size',
+                            }}
                         >
                             <p className="truncate font-semibold text-foreground">
                                 <span className="mono mr-1.5">{table.ids[tipRow]}</span>{table.labels[tipRow] !== table.ids[tipRow] ? table.labels[tipRow] : ''}
