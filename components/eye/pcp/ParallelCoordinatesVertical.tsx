@@ -324,18 +324,19 @@ export default function ParallelCoordinatesVertical({ axes, catalog, table, reve
                                 backfaceVisibility: 'hidden',
                             }}
                         >
-                            <p className="truncate font-semibold text-foreground">
-                                <span className="mono mr-1.5">{table.ids[tipRow]}</span>{table.labels[tipRow] !== table.ids[tipRow] ? table.labels[tipRow] : ''}
+                            <p className="flex min-w-0 items-baseline gap-1.5 font-semibold text-foreground" style={{ overflow: 'hidden' }}>
+                                <span className="mono flex-none">{table.ids[tipRow]}</span>
+                                <span className="min-w-0 flex-1 truncate">{table.labels[tipRow] !== table.ids[tipRow] ? table.labels[tipRow] : ''}</span>
                             </p>
                             <p className="truncate text-faint">{table.group[tipRow] ?? 'Industry unknown'}{!tipSelected && canAdd ? ' · click to add' : ''}</p>
-                            <dl className="mt-1.5 grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5">
+                            <dl className="mt-1.5 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5">
                                 {axes.map((a) => {
                                     const v = table.columns[a.id]?.[tipRow];
                                     const raw = table.raw[a.id]?.[tipRow];
                                     return (
                                         <React.Fragment key={a.id}>
-                                            <dt className="truncate text-faint">{a.labelEn}</dt>
-                                            <dd className="num text-right text-foreground">
+                                            <dt className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-faint">{a.labelEn}</dt>
+                                            <dd className="num flex-none text-right text-foreground">
                                                 {a.kind === 'categorical' ? (typeof v === 'string' ? v : '—') : formatValue(a.format, typeof v === 'number' ? v : null)}
                                                 {a.isScore && typeof raw === 'number' && <span className="text-faint"> ({formatValue(a.rawFormat ?? 'num', raw)})</span>}
                                             </dd>
