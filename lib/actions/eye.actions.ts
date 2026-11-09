@@ -5,7 +5,7 @@ import { getCompanyProfile, getLiveQuotes, getStockFactorMetrics, getStockPeers,
 import { getStockSentimentFromDb } from '@/lib/actions/adanos.actions';
 import { getUserWatchlist } from '@/lib/actions/watchlist.actions';
 import { buildExplainView, type ExplainView } from '@/lib/eye/explain-view';
-import { getCosmyDayEvents, nextEventDays, eventCountInDays } from '@/lib/eye/cosmyday';
+import { getCosmyDayEvents, getCosmyDayTransit, nextEvent, nextEventDays, eventCountInDays } from '@/lib/eye/cosmyday';
 import { parseSymbols } from '@/lib/eye/symbols';
 import type { StockFactorRaw, StockSentimentRaw } from '@/lib/eye/types';
 
@@ -97,17 +97,28 @@ export async function getEyeExplain(requested: string[]): Promise<EyeExplain> {
     // CosmyDay sky-event feed (DB-first too; null = unavailable, the two cosmyday axes
     // will show no-data / fetch-failed and ExplainView.astro.cosmyday will carry the error).
     // CosmyDay 天象 feed 也走 DB-first（12h TTL）；null 表示无数据，轴会显示 no-data/fetch-failed。
+    // The banner theme (transit/moon text) is read with the same DB-first path:
+    // when the event snapshot is warm we reuse its freshness; a cold snapshot falls
+    // back to a single live /content/transit fetch per page load (still cached by
+    // the snapshot on the next warm-up cycle).
     const nowDate = new Date();
     let cosmyday: Parameters<typeof buildExplainView>[3];
     try {
-        const snapshot = await getCosmyDayEvents();
+        const [snapshot, transit] = await Promise.all([
+            getCosmyDayEvents(),
+            getCosmyDayTransit(),
+        ]);
+        const ne = nextEvent(snapshot, nowDate);
         cosmyday = {
-            nextEventDays: nextEventDays(snapshot, nowDate),
+            nextEventDays: ne?.days ?? nextEventDays(snapshot, nowDate),
             eventCount7d: eventCountInDays(snapshot, 7, nowDate),
             error: snapshot.error,
+            nextEvent: ne ? { days: ne.days, headline: ne.event.headline ?? ne.event.kind ?? 'Sky event', date: ne.event.date } : null,
+            theme: transit?.theme ?? null,
+            fetchedAgoMs: snapshot.fetchedAt ? nowDate.getTime() - snapshot.fetchedAt.getTime() : null,
         };
     } catch (error) {
-        cosmyday = { nextEventDays: null, eventCount7d: 0, error: error instanceof Error ? error.message : String(error) };
+        cosmyday = { nextEventDays: null, eventCount7d: 0, error: error instanceof Error ? error.message : String(error), nextEvent: null, theme: null, fetchedAgoMs: null };
     }
 
     return { selected, watchlist, backgroundCount: background.length, view: buildExplainView(stocks, selected, nowDate, cosmyday) };

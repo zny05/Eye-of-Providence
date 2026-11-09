@@ -72,6 +72,8 @@ export default function ParallelCoordinatesVertical({ axes, catalog, table, reve
     const baseRef = useRef<HTMLCanvasElement>(null);
     const overlayRef = useRef<HTMLCanvasElement>(null);
     const frame = useRef(0);
+    // cursor tracks the pointer for the tooltip's initial mount position;
+    // tooltip *paint* (position) is done via tooltipRef so moves never re-render.
     const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
 
     const rowCount = table.ids.length;
@@ -182,20 +184,46 @@ export default function ParallelCoordinatesVertical({ axes, catalog, table, reve
     const interactive = (e: React.SyntheticEvent) => !!(e.target as Element).closest('[data-eye-interactive]');
     const pointer = useRef('mouse');
 
-    // The tooltip is positioned with a ref-shared transform (no React re-render per
-    // pointermove) and a fixed height per axis count, so hovering does not resize
-    // the PCP container or thrash the layout. The hover-highlight itself keeps
-    // using the rAF-throttled React state path.
+    // Tooltip: 5ms debounce lets a stable hover read through the near-line
+    // flicker that confused the old rAF-per-move path. Position is written
+    // directly to the DOM via transform (no React re-render, no layout),
+    // with a fixed height per axis count and above/below placement chosen
+    // so the box never pushes the chart wider (no reflow either way).
+    const TOOLTIP_W = 240;
+    const TIP_OFFSET = 14;
     const tooltipRef = useRef<HTMLDivElement>(null);
     const pendingCursor = useRef<{ x: number; y: number } | null>(null);
+    const hoverTimer = useRef<number | null>(null);
+    const paintHoverTimer = useRef<number | null>(null);
+    const tipHeight = 18 + n * 18 + 32;
 
-    const paintTooltip = useCallback(() => {
-        if (!tooltipRef.current || !pendingCursor.current) return;
-        const { x, y } = pendingCursor.current;
-        tooltipRef.current.style.transform = `translate(${Math.min(x + 14, Math.max(0, g.W - 250))}px, ${y + 14}px)`;
+    const paintTooltip = useCallback((x: number, y: number) => {
+        if (!tooltipRef.current) return;
+        // Vertical flip: if the box would spill past the stage bottom, place
+        // it above the cursor instead — mirroring horizontal clamp logic.
+        const belowWouldOverflow = y + TIP_OFFSET + tipHeight > g.H;
+        const ty = belowWouldOverflow ? Math.max(0, y - tipHeight - TIP_OFFSET) : y + TIP_OFFSET;
+        const tx = Math.min(x + TIP_OFFSET, Math.max(0, g.W - TOOLTIP_W - 4));
+        tooltipRef.current.style.transform = `translate(${tx}px, ${ty}px)`;
         tooltipRef.current.style.left = '0px';
         tooltipRef.current.style.top = '0px';
-    }, [g.W]);
+    }, [g.H, g.W, tipHeight]);
+
+    const scheduleHover = useCallback((r: number | null) => {
+        if (hoverTimer.current !== null) window.clearTimeout(hoverTimer.current);
+        if (r === null) {
+            hoverTimer.current = window.setTimeout(() => onHoverChange(undefined), 5);
+            return;
+        }
+        const id = table.ids[r];
+        if (id === hoverId) return; // already highlighted — don't reschedule
+        hoverTimer.current = window.setTimeout(() => {
+            onHoverChange(id);
+            paintHoverTimer.current = window.requestAnimationFrame(() => {
+                if (pendingCursor.current) paintTooltip(pendingCursor.current.x, pendingCursor.current.y);
+            });
+        }, 5);
+    }, [hoverId, onHoverChange, paintTooltip, table.ids]);
 
     const onPointerMove = (e: React.PointerEvent) => {
         pointer.current = e.pointerType;
@@ -206,13 +234,18 @@ export default function ParallelCoordinatesVertical({ axes, catalog, table, reve
         }
         const { x, y } = point(e);
         pendingCursor.current = { x, y };
-        // Tooltip paint (cheap, runs outside React): direct DOM, no layout.
-        if (tooltipRef.current) paintTooltip();
-        cancelAnimationFrame(frame.current);
-        frame.current = requestAnimationFrame(() => {
+        // Tooltip positioning is paint-only (no layout/re-render); do it
+        // synchronously so the box follows the pointer without flicker.
+        paintTooltip(x, y);
+        // Keep the state cursor in sync so a fresh React mount paints the
+        // tooltip at the right place (first hover after axis changes).
+        if (!cursor || cursor.x !== x || cursor.y !== y) setCursor({ x, y });
+        // Hover highlight stays debounced at 5ms so a fast crossing doesn't
+        // thrash canvas redraw — the tooltip itself never waits for it.
+        if (paintHoverTimer.current !== null) window.cancelAnimationFrame(paintHoverTimer.current);
+        paintHoverTimer.current = window.requestAnimationFrame(() => {
             const r = hit(x, y, 7);
-            onHoverChange(r === null ? undefined : table.ids[r]);
-            setCursor({ x, y });
+            scheduleHover(r);
         });
     };
 
@@ -275,15 +308,20 @@ export default function ParallelCoordinatesVertical({ axes, catalog, table, reve
                                 // paints a fixed budget; overflow is clipped, never reflowed.
                                 // Position is written to the same element by paintTooltip() via
                                 // transform — this initial top/left is just the first paint.
-                                left: pendingCursor.current ? Math.min(pendingCursor.current.x + 14, Math.max(0, g.W - 250)) : (cursor ? Math.min(cursor.x + 14, Math.max(0, g.W - 250)) : 0),
-                                top: pendingCursor.current ? pendingCursor.current.y + 14 : (cursor ? cursor.y + 14 : 0),
-                                height: 18 + axes.length * 18 + 32,
+                                left: 0,
+                                top: 0,
+                                height: tipHeight,
                                 display: 'flex',
                                 flexDirection: 'column',
                                 transform: 'translateZ(0)',
-                                willChange: 'transform',
+                                willChange: 'transform, opacity',
                                 overflow: 'hidden',
                                 contain: 'layout size',
+                                // The only thing that collapses is opacity — no layout, no size,
+                                // so hovering the chart can never push the canvas wider.
+                                opacity: cursor || pendingCursor.current ? 1 : 0,
+                                transition: 'opacity 80ms cubic-bezier(0.33, 1, 0.68, 1)',
+                                backfaceVisibility: 'hidden',
                             }}
                         >
                             <p className="truncate font-semibold text-foreground">

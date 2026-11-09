@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Eye, Moon, Plus, RotateCcw, Sparkles, X } from 'lucide-react';
+import { CalendarClock, Eye, Moon, Plus, RotateCcw, Sparkles, Sun, X } from 'lucide-react';
 import Panel from '@/components/Panel';
 import ParallelCoordinatesVertical from '@/components/eye/pcp/ParallelCoordinatesVertical';
 import type { EyeExplain } from '@/lib/actions/eye.actions';
@@ -123,15 +123,19 @@ export default function EyeWorkbench({ data }: { data: EyeExplain }) {
     }, []);
     const toggleReverse = useCallback((id: string) => setReversed((prev) => ({ ...prev, [id]: !prev[id] })), []);
 
-    // Content banner (third step): one line of transit theme from CosmyDay, when available.
-    const transitLine = useMemo(() => {
-        // The CosmyDay /events/upcoming feed does not carry narrative text, so we surface
-        // the next event's headline instead. The local moon phase + retrograde list are
-        // computed from astronomy-engine on the server and ride along in view.astro.
+    // Content banner (third step — text layer, never an axis): moon phase +
+    // next sky event + one-line transit theme from CosmyDay. All components are
+    // plain horizontal text; nothing rotates and nothing resizes the PCP below.
+    const banner = useMemo(() => {
         if (!view) return null;
         const cd = view.astro.cosmyday;
-        if (cd.nextEventDays === null) return null;
-        return `Next sky event in ${cd.nextEventDays} day${cd.nextEventDays === 1 ? '' : 's'}`;
+        const moonBits = `${view.astro.moon.name}, ${Math.round(view.astro.moon.illumination * 100)}% lit`;
+        const sunBits = `Sun in ${view.astro.sunSign} ${view.astro.sunSignDegree.toFixed(0)}°`;
+        const moonSignBits = `Moon in ${view.astro.moon.sign} ${view.astro.moon.signDegree.toFixed(0)}°`;
+        const retroBits = `Retrograde: ${view.astro.retrograde.length ? view.astro.retrograde.join(', ') : 'none'}`;
+        const nextBits = cd.nextEvent ? `${cd.nextEvent.headline} — in ${cd.nextEvent.days} day${cd.nextEvent.days === 1 ? '' : 's'}` : (cd.nextEventDays === null ? null : `Next event in ${cd.nextEventDays} days`);
+        const fetched = cd.fetchedAgoMs !== null && cd.fetchedAgoMs !== undefined ? `cached ${Math.max(0, Math.round(cd.fetchedAgoMs / 60_000))}m ago` : null;
+        return { moonBits, sunBits, moonSignBits, retroBits, nextBits, theme: cd.theme ?? null, error: cd.error ?? null, fetched };
     }, [view]);
 
     return (
@@ -194,16 +198,31 @@ export default function EyeWorkbench({ data }: { data: EyeExplain }) {
                 </Panel>
             ) : (
                 <>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-dashed border-[#8b5cf6]/40 bg-[#8b5cf6]/5 px-3 py-2 text-[12px] text-muted-foreground">
-                        <Moon className="size-4 text-[#c4a35a]" />
-                        <span><span className="font-semibold text-foreground">Symbolic layer</span> · {view.astro.moon.name}, {Math.round(view.astro.moon.illumination * 100)}% lit</span>
-                        <span>Sun in {view.astro.sunSign} {view.astro.sunSignDegree.toFixed(0)}°</span>
-                        <span>Moon in {view.astro.moon.sign} {view.astro.moon.signDegree.toFixed(0)}°</span>
-                        <span>Retrograde now: {view.astro.retrograde.length ? view.astro.retrograde.join(', ') : 'none'}</span>
-                        {transitLine && <span className="flex items-center gap-1"><Sparkles className="size-3.5 text-[#c4a35a]" /> {transitLine}</span>}
-                        {view.astro.cosmyday.error && <span className="text-faint">CosmyDay feed unavailable — event axes may be empty ({view.astro.cosmyday.error})</span>}
-                        <span className="text-faint">Cultural overlay, no demonstrated effect on prices.</span>
-                    </div>
+                    {banner && (
+                        <div
+                            data-eye-banner
+                            className="flex flex-col gap-1.5 rounded-xl border border-dashed border-[#8b5cf6]/40 bg-[#8b5cf6]/5 px-3.5 py-2.5 text-[12px] leading-relaxed text-muted-foreground"
+                            style={{ minHeight: '56px', contain: 'layout' }}
+                        >
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                                <span className="flex items-center gap-1.5"><Sparkles className="size-3.5 text-[#c4a35a]" /> <span className="font-semibold text-foreground">Today&apos;s sky</span></span>
+                                <span className="flex items-center gap-1"><Moon className="size-3.5 text-[#c4a35a]" /> {banner.moonBits}</span>
+                                <span className="flex items-center gap-1"><Sun className="size-3.5 text-[#c4a35a]" /> {banner.sunBits}</span>
+                                <span>{banner.moonSignBits}</span>
+                                <span>{banner.retroBits}</span>
+                                <span className="text-faint">Cultural overlay, no demonstrated effect on prices.</span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px]">
+                                {banner.nextBits && (
+                                    <span className="flex items-center gap-1 text-foreground"><CalendarClock className="size-3.5 text-[#c4a35a]" /> {banner.nextBits}</span>
+                                )}
+                                {banner.theme ? <span className="italic text-faint">“{banner.theme}”</span> : <span className="text-faint">Transit theme: no daily text yet (CosmyDay /content/transit)</span>}
+                                {banner.error && <span className="text-faint">CosmyDay feed unavailable — event axes may be empty ({banner.error})</span>}
+                                {banner.fetched && <span className="num ml-auto text-[11px] text-faint">{banner.fetched}</span>}
+                                <span className="text-[10px] leading-none text-faint/70">Data: CosmyDay (Swiss Ephemeris)</span>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
                         <Panel

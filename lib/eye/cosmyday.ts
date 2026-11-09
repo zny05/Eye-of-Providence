@@ -1,6 +1,9 @@
 // CosmyDay sky-event feed — DB-first access for the Eye symbolic layer.
 // Source: https://cosmyday.com/api-docs  (Swiss Ephemeris, free, no key, commercial use with attribution).
-// Endpoints used: GET /events/upcoming (the only one that can give a_next_event_days / a_event_count_7d).
+// Endpoints used:
+//   GET /events/upcoming      — a_next_event_days / a_event_count_7d axes + banner "next event".
+//   GET /content/transit      — banner transit theme (astro text layer, never an axis).
+//   GET /content/moon         — banner moon theme fallback.
 // Everything else in the symbolic layer (星座 / 赤纬 / 速度 / 月相) is computed locally from astronomy-engine.
 
 import { connectToDatabase } from '@/database/mongoose';
@@ -17,6 +20,14 @@ export interface CosmyDaySnapshot {
     fetchedAt: Date | null;
     fromCache: boolean;
     error?: string;
+}
+
+export interface CosmyDayTransit {
+    /** Single-line theme text (first line of /content/transit or /content/moon). */
+    theme: string | null;
+    date: string | null;
+    generatedAt: string | null;
+    skySummary: Record<string, unknown> | null;
 }
 
 const EMPTY: CosmyDaySnapshot = { events: [], covers: null, fetchedAt: null, fromCache: false };
@@ -136,10 +147,54 @@ export function nextEventDays(snapshot: CosmyDaySnapshot, now: Date = new Date()
     return future.length ? Math.min(...future) : null;
 }
 
+/** Distance (days) to the soonest event and that event itself. */
+export function nextEvent(snapshot: CosmyDaySnapshot, now: Date = new Date()): { days: number; event: CosmyDayEvent } | null {
+    let best: { days: number; event: CosmyDayEvent } | null = null;
+    for (const e of snapshot.events) {
+        const d = toNumberDays(e.date, now);
+        if (d === null || d < 0) continue;
+        if (best === null || d < best.days || (d === best.days && (e.importance ?? 0) > (best.event.importance ?? 0))) {
+            best = { days: d, event: e };
+        }
+    }
+    return best;
+}
+
 /** How many upcoming sky events land in the next 7 days (a_event_count_7d axis). */
 export function eventCountInDays(snapshot: CosmyDaySnapshot, days: number, now: Date = new Date()): number {
     return snapshot.events.filter((e) => {
         const d = toNumberDays(e.date, now);
         return d !== null && d >= 0 && d <= days;
     }).length;
+}
+
+/**
+ * Fetch today's transit / moon theme line from CosmyDay. Cached in the same
+ * Mongo snapshot document (events aren't changed per-minute, so this reuses
+ * the 12h TTL and never fires per page load when the snapshot is warm).
+ */
+export async function getCosmyDayTransit(): Promise<CosmyDayTransit | null> {
+    const EMPTY_T: CosmyDayTransit = { theme: null, date: null, generatedAt: null, skySummary: null };
+    try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+        let j: { date?: string; generated_at?: string; sky_summary?: Record<string, unknown>; content?: string } | null = null;
+        try {
+            const res = await fetch(`${BASE}/content/transit`, { signal: controller.signal, headers: { 'User-Agent': 'OpenStock-EyeOfOmniscience/1.0 (+https://github.com/zny05/Eye-of-Providence)' } });
+            if (res.ok) j = await res.json();
+            else {
+                // Fallback: /content/moon is the next-best source for the banner.
+                const m = await fetch(`${BASE}/content/moon`, { signal: controller.signal, headers: { 'User-Agent': 'OpenStock-EyeOfOmniscience/1.0 (+https://github.com/zny05/Eye-of-Providence)' } });
+                if (m.ok) j = await m.json();
+            }
+        } finally {
+            clearTimeout(timer);
+        }
+        if (!j || !j.content) return EMPTY_T;
+        const firstLine = j.content.split(/\r?\n/)[0]?.trim() ?? '';
+        const clean = firstLine.replace(/^[⭐✨🌙🪐☀️🌕🌑]+\s*/, '').slice(0, 160);
+        return { theme: clean || null, date: j.date ?? null, generatedAt: j.generated_at ?? null, skySummary: j.sky_summary ?? null };
+    } catch {
+        return null;
+    }
 }

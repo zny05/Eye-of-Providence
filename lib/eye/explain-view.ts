@@ -121,6 +121,12 @@ export interface CosmyDayContext {
     nextEventDays: number | null;
     eventCount7d: number;
     error?: string;
+    /** Closest upcoming sky event for the banner (headline + days away). */
+    nextEvent?: { days: number; headline: string; date: string } | null;
+    /** Single-line transit/moon theme for the banner (CosmyDay /content/transit). */
+    theme?: string | null;
+    /** Snapshot freshness (ms since Mongo write) — null when live-fetched this request. */
+    fetchedAgoMs?: number | null;
 }
 
 export interface ExplainView {
