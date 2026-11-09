@@ -31,7 +31,14 @@
       "WebSearch",
       "Bash(Remove-Item -LiteralPath \"lib/eye/stock-view.ts\" -Force)",
       "Bash(Test-Path \"lib/eye/stock-view.ts\")",
-      "Bash(echo \"exit:$?\")"
+      "Bash(echo \"exit:$?\")",
+      "Bash(curl -sL --max-time 10 https://cosmyday.com/api-docs)",
+      "Bash(curl -sL --max-time 10 https://astro-agent.dev/llms.txt)",
+      "Bash(curl -sL --max-time 10 https://www.cyclecalcs.com/api.html)",
+      "Bash(curl -sL --max-time 15 \"https://api.cosmyday.com/events/upcoming?days=30&min_importance=60\")",
+      "Bash(curl -sL --max-time 15 \"https://api.cosmyday.com/health\")",
+      "Bash(curl -sL --max-time 15 \"https://api.cosmyday.com/content/transit\")",
+      "Bash(node -e ' *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\HadesCanyon\\.claude\\projects\\c--Users-HadesCanyon-Downloads-Eye-of-Providence"
