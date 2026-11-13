@@ -18,7 +18,7 @@ export default function WhoAreYouPage() {
                     </p>
                 </div>
             </header>
-            <div className="flex-1 min-h-0 w-full overflow-hidden rounded-[12px] border border-line shadow-sm bg-canvas">
+            <div className="flex-1 min-h-[400px] w-full rounded-[12px] border border-line shadow-sm bg-canvas">
                 <iframe
                     src="/who-are-you/index.html?embed=1"
                     className="w-full h-full border-0"
