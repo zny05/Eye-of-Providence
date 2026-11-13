@@ -44,7 +44,9 @@
       "Bash(taskkill //F //IM git.exe //IM git-remote-https.exe)",
       "Bash(node scripts/rewrite-who-are-you-paths.mjs public/who-are-you)",
       "Bash(echo \"=== tsc exit: $? ===\")",
-      "Bash(echo \"=== eslint exit: $? ===\")"
+      "Bash(echo \"=== eslint exit: $? ===\")",
+      "Bash(node scripts/fix-data-paths.mjs public/who-are-you)",
+      "Bash(node scripts/fix-whoareyou-html.mjs public/who-are-you)"
     ],
     "additionalDirectories": [
       "C:\\Users\\HadesCanyon\\.claude\\projects\\c--Users-HadesCanyon-Downloads-Eye-of-Providence",
