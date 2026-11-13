@@ -321,7 +321,7 @@ export function share(o) {
     const c = document.createElement("canvas"); c.width = W; c.height = H;
     const x = c.getContext("2d");
     x.fillStyle = v("bg") || (dark ? "#0b0d10" : "#fff"); x.fillRect(0, 0, W, H);
-    try { x.drawImage(await img(dark ? "/who-are-you/assets/logo-dark.svg" : "/who-are-you/assets/logo-light.svg"), P, 40, 150, 60); } catch (e) {}
+    try { x.drawImage(await img(dark ? "/who-are-you/assets/logo-dark.png" : "/who-are-you/assets/logo-light.png"), P, 40, 150, 60); } catch (e) {}
     x.textBaseline = "alphabetic";
     x.fillStyle = v("muted"); x.font = `600 24px ${F}`;
     x.fillText(clip(x, [o.name, location.host].filter(Boolean).join("  ·  "), W - P * 2 - 170 - 170), P + 170, 80);
