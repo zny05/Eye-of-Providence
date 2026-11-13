@@ -18,10 +18,10 @@ export default function WhoAreYouPage() {
                     </p>
                 </div>
             </header>
-            <div className="flex-1 min-h-[400px] w-full rounded-[12px] border border-line shadow-sm bg-canvas">
+            <div className="w-full rounded-[12px] border border-line shadow-sm bg-canvas">
                 <iframe
                     src="/who-are-you/index.html?embed=1"
-                    className="w-full h-full border-0"
+                    className="w-full min-h-[calc(100dvh-320px)] border-0"
                     title="Who are you — privacy self-check"
                     allow="geolocation"
                 />
