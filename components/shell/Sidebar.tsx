@@ -17,11 +17,18 @@ type SidebarProps = {
 };
 
 const RESOURCES = [
-    { href: '/adanos', label: 'Adanos sentiment', icon: Gauge },
-    { href: '/help', label: 'Help', icon: LifeBuoy },
-    { href: '/api-docs', label: 'API docs', icon: Code2 },
-    { href: '/about', label: 'About', icon: Info },
-    { href: '/terms', label: 'Terms', icon: BookOpen },
+    { href: '/adanos', label: 'Adanos sentiment', icon: <Gauge /> },
+    { href: '/help', label: 'Help', icon: <LifeBuoy /> },
+    { href: '/api-docs', label: 'API docs', icon: <Code2 /> },
+    { href: '/about', label: 'About', icon: <Info /> },
+    { href: '/terms', label: 'Terms', icon: <BookOpen /> },
+    {
+        href: '/who-are-you',
+        label: 'Who are you',
+        icon: (
+            <Image src="/assets/images/who-are-you.png" alt="Who are you" width={17} height={11} priority />
+        ),
+    },
 ];
 
 const Sidebar = ({ user, watchlist }: SidebarProps) => {
@@ -94,7 +101,8 @@ const Sidebar = ({ user, watchlist }: SidebarProps) => {
             <div className="mt-auto flex flex-col gap-0.5">
                 {RESOURCES.map(({ href, label, icon: Icon }) => (
                     <Link key={href} href={href} className={cn('side-item h-8', pathname === href && 'is-active')}>
-                        <Icon /> {label}
+                        <span className="flex items-center gap-2">{Icon}</span>
+                        {label}
                     </Link>
                 ))}
                 <button

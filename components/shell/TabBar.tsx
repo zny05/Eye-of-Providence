@@ -15,6 +15,7 @@ const PAGE_LABELS: Record<string, string> = {
     '/dashboard': 'Overview',
     '/watchlist': 'Watchlist',
     '/eye': 'Eye of Omniscience',
+    '/who-are-you': 'Who are you',
     '/profile': 'Profile',
 };
 

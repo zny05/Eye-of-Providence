@@ -1,0 +1,90 @@
+/* Compare mode (compare.js). Colors come from the tool's theme variables (--fg --muted --line --soft, --good / --bad
+   when the tool has them, and the speed colors the tool names for its key numbers and uses), so it follows light
+   and dark. The rows show the change only: green or red, as a bar from the middle; unchanged rows stay grey. Rows, group
+   titles and the gaps between groups have fixed heights (compare.js SIZE), so a tool can reserve the space. */
+.msc,.msc-head{--msc-good:var(--good,#1a8a5a);--msc-bad:var(--bad,#d23a2f);--msc-a:color-mix(in srgb,var(--muted,#888) 75%,transparent)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) :is(.msc,.msc-head){--msc-good:var(--good,#3ecf8e);--msc-bad:var(--bad,#f56565)}}
+:root[data-theme="dark"] :is(.msc,.msc-head){--msc-good:var(--good,#3ecf8e);--msc-bad:var(--bad,#f56565)}
+.msc *,.msc-head *{box-sizing:border-box}
+.msc p,.msc-head p,.msc h3{margin:0}
+
+/* the head, in the tool's banner: verdict, detail, then A and B. One line each (two for the verdict and the detail on
+   a narrow screen), cut with an ellipsis, so the banner is as tall whatever they say */
+.msc-head{container-type:inline-size;display:flex;flex-direction:column;gap:3px;min-width:0}
+.msc-h{font-size:17px;font-weight:700;line-height:1.35;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msc-h.msc-better{color:var(--msc-good)}.msc-h.msc-worse{color:var(--msc-bad)}
+.msc-d{font-size:13px;line-height:1.5;color:var(--muted,#666);min-height:1.5em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msc-sides{display:flex;flex-direction:column;gap:2px;margin-top:5px;font-size:12.5px;line-height:20px}
+.msc-side{display:flex;align-items:center;gap:7px;min-width:0;white-space:nowrap}
+.msc-side>span{overflow:hidden;text-overflow:ellipsis}
+.msc-side>span:not(.msc-sub){flex:none;font-variant-numeric:tabular-nums}
+.msc-sub{color:var(--muted,#666);min-width:0}
+/* A and B: an outlined badge and a solid one, the same in the banner and the column heads */
+.msc-badge{flex:none;display:inline-grid;place-items:center;width:17px;height:17px;border-radius:4px;font:700 10.5px/1 var(--f-ui,sans-serif);font-style:normal;letter-spacing:0}
+.msc-badge.msc-a{box-shadow:inset 0 0 0 1.5px var(--msc-a);color:var(--muted,#666)}
+.msc-badge.msc-b{background:var(--fg,#111);color:var(--bg,#fff)}
+@container (max-width:480px){
+  .msc-h,.msc-d{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+  .msc-h{min-height:2.7em}.msc-d{min-height:3em}
+}
+
+.msc{container-type:inline-size;display:flex;flex-direction:column;gap:14px;min-width:0}
+/* the key numbers' and uses' B in the tool's speed color (set per element by compare.js as --msc-tier) */
+.msc [data-tier]{--msc-tier:var(--fg,#111)}
+.msc-stat .msc-vb{color:var(--msc-tier)}
+.msc-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.msc-stat{display:flex;flex-direction:column;gap:2px;height:84px;background:var(--soft,#8881);border-radius:12px;padding:10px 14px;min-width:0}
+.msc-stat em{font-style:normal;font-size:12px;color:var(--muted,#666);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msc-stat b{font:600 24px/1.15 var(--f-num,ui-monospace,monospace);letter-spacing:-.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msc-stat .msc-va{color:var(--muted,#666)}
+.msc-stat b small{font:400 13px var(--f-ui,sans-serif);color:var(--muted,#666);margin-left:5px;letter-spacing:0}
+.msc-stat b .msc-ar{margin:0 6px}
+.msc-stat i{font-style:normal;font-size:12.5px;color:var(--muted,#666);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msc-stat.msc-up i{color:var(--msc-good)}.msc-stat.msc-dn i{color:var(--msc-bad)}
+/* everyday uses: one row of equal cells; a changed one shows before → after */
+.msc-uses{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;font-size:12.5px}
+.msc-use{display:flex;align-items:center;gap:5px;height:30px;padding:0 10px;border-radius:8px;background:color-mix(in srgb,var(--soft,#8881) 70%,transparent);white-space:nowrap;overflow:hidden;min-width:0}
+.msc-use em{font-style:normal;color:var(--muted,#666);overflow:hidden;text-overflow:ellipsis}
+.msc-use b{color:var(--msc-tier);font-weight:600}
+.msc-use .msc-ua{color:var(--muted,#666)}.msc-use small{color:var(--muted,#666)}
+.msc-use.msc-up{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--msc-good) 55%,transparent)}
+.msc-use.msc-dn{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--msc-bad) 55%,transparent)}
+/* groups: in one column, two once the box is wide (compare.js columns() decides the split) */
+.msc-cols{display:grid;grid-template-columns:minmax(0,1fr);gap:14px 32px}
+.msc-col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.msc-col+.msc-col>.msc-hd{display:none}
+.msc-g h3{height:30px;display:flex;align-items:flex-end;padding-bottom:5px;font-size:11.5px;font-weight:600;color:var(--muted,#666);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--line,#8884)}
+/* a row: name · A · B · the change as a bar · the change in numbers */
+.msc-r{display:grid;grid-template-columns:minmax(64px,140px) 44px 44px minmax(48px,1fr) 116px;align-items:center;gap:0 10px;height:34px;border-bottom:1px solid color-mix(in srgb,var(--line,#8884) 50%,transparent);font-size:13px}
+.msc-hd{height:24px;margin-bottom:-14px;border-bottom:0;font-size:11px;font-weight:600;color:var(--muted,#666);letter-spacing:.03em}
+.msc-hd b{font:inherit;display:flex;justify-content:flex-end}
+.msc-bar-h{display:flex;justify-content:space-between;gap:6px;font-weight:500;white-space:nowrap;overflow:hidden}
+.msc-bar-h em{font-style:normal;overflow:hidden;text-overflow:ellipsis}
+.msc-bar-h s{text-decoration:none;font-weight:700}.msc-bar-h s.msc-up{color:var(--msc-good)}.msc-bar-h s.msc-dn{color:var(--msc-bad)}
+.msc-n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msc-r>b{font:500 13px var(--f-num,ui-monospace,monospace);text-align:right;white-space:nowrap}
+.msc-r>.msc-va{color:var(--muted,#666);font-weight:400}
+.msc-c{text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:600 12.5px var(--f-num,ui-monospace,monospace)}
+.msc-c small{font:400 11.5px var(--f-ui,sans-serif);margin-left:6px;opacity:.85}
+.msc-hd .msc-c{font:inherit;text-transform:uppercase}
+.msc-up .msc-c{color:var(--msc-good)}.msc-dn .msc-c{color:var(--msc-bad)}
+.msc-st-gone .msc-c{font:400 12px var(--f-ui,sans-serif);color:var(--muted,#666)}
+/* unchanged rows recede; the changed ones are the only ones in full color */
+.msc-r.msc-eq .msc-n,.msc-r.msc-eq>.msc-vb{color:var(--muted,#666)}
+.msc-r:not(.msc-eq) .msc-n{font-weight:600}
+/* the bar: a line down the middle; left of it faster (green), right of it slower (red), longer the more times */
+.msc-bar{position:relative;height:14px}
+.msc-bar::before{content:"";position:absolute;left:50%;top:-10px;bottom:-11px;width:1px;background:color-mix(in srgb,var(--line,#8884) 90%,transparent)}
+.msc-bar i{position:absolute;top:2px;height:10px;border-radius:3px}
+.msc-up .msc-bar i{right:50%;background:var(--msc-good)}
+.msc-dn .msc-bar i{left:50%;background:var(--msc-bad)}
+@container (min-width:720px){
+  .msc-cols{grid-template-columns:repeat(2,minmax(0,1fr))}.msc-col+.msc-col>.msc-hd{display:grid}
+}
+@container (max-width:480px){
+  .msc-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.msc-stat:nth-child(3){grid-column:1/-1}.msc-stat{padding:10px 12px}.msc-stat b{font-size:18px}.msc-stat b .msc-ar{margin:0 3px}.msc-stat b small{margin-left:3px}
+  .msc-uses{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .msc-r{grid-template-columns:minmax(56px,1fr) 36px 36px minmax(40px,.9fr) 64px;gap:0 7px;font-size:12.5px}
+  .msc-bar-h span{display:none}
+  .msc-c small{display:none}
+}
