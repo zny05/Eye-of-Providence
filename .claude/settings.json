@@ -38,10 +38,19 @@
       "Bash(curl -sL --max-time 15 \"https://api.cosmyday.com/events/upcoming?days=30&min_importance=60\")",
       "Bash(curl -sL --max-time 15 \"https://api.cosmyday.com/health\")",
       "Bash(curl -sL --max-time 15 \"https://api.cosmyday.com/content/transit\")",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(kill -9 873 849 848)",
+      "Bash(taskkill //F //IM git.exe //IM git-remote-https.exe)",
+      "Bash(node scripts/rewrite-who-are-you-paths.mjs public/who-are-you)",
+      "Bash(echo \"=== tsc exit: $? ===\")",
+      "Bash(echo \"=== eslint exit: $? ===\")"
     ],
     "additionalDirectories": [
-      "C:\\Users\\HadesCanyon\\.claude\\projects\\c--Users-HadesCanyon-Downloads-Eye-of-Providence"
+      "C:\\Users\\HadesCanyon\\.claude\\projects\\c--Users-HadesCanyon-Downloads-Eye-of-Providence",
+      "c:\\Users\\HadesCanyon\\Downloads\\Eye-of-Providence\\.git\\modules\\submodules\\who-are-you",
+      "c:\\Users\\HadesCanyon\\Downloads\\Eye-of-Providence\\.git\\modules\\submodules\\who-are-you\\objects\\pack",
+      "\\tmp"
     ]
   }
 }
